@@ -130,6 +130,61 @@ export function RadarTab() {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
+  // Device compass — use deviceorientation alpha as heading.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handle = (e: DeviceOrientationEvent) => {
+      // webkitCompassHeading on iOS Safari is the "true" compass heading (already inverted).
+      const w = e as DeviceOrientationEvent & { webkitCompassHeading?: number };
+      let alpha: number | null = null;
+      if (typeof w.webkitCompassHeading === "number") {
+        alpha = w.webkitCompassHeading;
+      } else if (typeof e.alpha === "number") {
+        alpha = 360 - e.alpha; // alpha is counter-clockwise from N → invert.
+      }
+      if (alpha === null || Number.isNaN(alpha)) return;
+      headingTargetRef.current = ((alpha % 360) + 360) % 360;
+      setHasCompass(true);
+    };
+
+    // iOS 13+ requires explicit permission after a user gesture.
+    type IOSOrientationCtor = typeof DeviceOrientationEvent & {
+      requestPermission?: () => Promise<"granted" | "denied">;
+    };
+    const Ctor = DeviceOrientationEvent as unknown as IOSOrientationCtor;
+    const needsIOSPermission = typeof Ctor.requestPermission === "function";
+
+    let attached = false;
+    const attach = () => {
+      if (attached) return;
+      attached = true;
+      window.addEventListener("deviceorientation", handle, true);
+    };
+
+    if (needsIOSPermission) {
+      // Wait for any user interaction to request permission, then attach.
+      const onGesture = async () => {
+        try {
+          const res = await Ctor.requestPermission!();
+          if (res === "granted") attach();
+        } catch {
+          // ignore — falls back to static labels.
+        }
+        window.removeEventListener("touchend", onGesture);
+        window.removeEventListener("click", onGesture);
+      };
+      window.addEventListener("touchend", onGesture, { once: true });
+      window.addEventListener("click", onGesture, { once: true });
+    } else {
+      attach();
+    }
+
+    return () => {
+      if (attached) window.removeEventListener("deviceorientation", handle, true);
+    };
+  }, []);
+
   async function loadReports() {
     if (!pos) return;
     const { data } = await supabase

@@ -137,6 +137,31 @@ export function ChatView({ peerId, peerCode, groupId, groupName, onBack }: Props
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
+  // Resolve sender user_codes for group messages we don't already know.
+  useEffect(() => {
+    if (!groupId) return;
+    const missing = Array.from(
+      new Set(messages.map((m) => m.sender_id).filter((id) => !senderCodes[id])),
+    );
+    if (missing.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("users")
+        .select("id, user_code")
+        .in("id", missing);
+      if (!data || cancelled) return;
+      setSenderCodes((prev) => {
+        const next = { ...prev };
+        for (const u of data) next[u.id] = u.user_code;
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [messages, groupId, senderCodes]);
+
   async function send() {
     if (!identity || !draft.trim() || sending) return;
     const content = draft.trim().slice(0, MAX_LEN);

@@ -207,11 +207,11 @@ export function RadarTab() {
     const ro = new ResizeObserver(resize);
     ro.observe(container);
 
-    const GREEN = "#00ff41";
-    const GREEN_DIM = "rgba(0, 255, 65, 0.25)";
-    const GREEN_FAINT = "rgba(0, 255, 65, 0.12)";
-    const GREEN_LABEL = "rgba(0, 255, 65, 0.55)";
-    const BG = "#001208";
+    const GREEN = "#00d4ff";
+    const GREEN_DIM = "rgba(0, 212, 255, 0.25)";
+    const GREEN_FAINT = "rgba(0, 212, 255, 0.12)";
+    const GREEN_LABEL = "rgba(0, 212, 255, 0.55)";
+    const BG = "#000a12";
     const RED = "#ff2b2b";
 
     const start = performance.now();
@@ -231,7 +231,7 @@ export function RadarTab() {
       const maxR = Math.min(width, height) / 2 - 12;
 
       // Fine grid network across the whole canvas (CRT feel).
-      ctx.strokeStyle = "rgba(0, 255, 65, 0.06)";
+      ctx.strokeStyle = "rgba(0, 212, 255, 0.06)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       const GRID = 22;
@@ -248,7 +248,7 @@ export function RadarTab() {
       // Outer disc fill (slightly lighter than bg).
       ctx.beginPath();
       ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(0, 40, 18, 0.55)";
+      ctx.fillStyle = "rgba(0, 20, 40, 0.55)";
       ctx.fill();
 
       // Concentric rings: 1km, 2km, 5km (relative to RADIUS_KM scope).
@@ -281,7 +281,7 @@ export function RadarTab() {
 
       // Diagonal grid lines (45°).
       const diag = maxR * Math.SQRT1_2;
-      ctx.strokeStyle = "rgba(0, 255, 65, 0.06)";
+      ctx.strokeStyle = "rgba(0, 212, 255, 0.06)";
       ctx.beginPath();
       ctx.moveTo(cx - diag, cy - diag);
       ctx.lineTo(cx + diag, cy + diag);
@@ -348,8 +348,8 @@ export function RadarTab() {
       pctx.closePath();
       // Radial gradient: dim at center, bright at rim (more energy at scan edge).
       const radial = pctx.createRadialGradient(cx, cy, maxR * 0.1, cx, cy, maxR);
-      radial.addColorStop(0, "rgba(0, 255, 65, 0.05)");
-      radial.addColorStop(1, "rgba(0, 255, 65, 0.55)");
+      radial.addColorStop(0, "rgba(0, 212, 255, 0.05)");
+      radial.addColorStop(1, "rgba(0, 212, 255, 0.55)");
       pctx.fillStyle = radial;
       pctx.fill();
       pctx.restore();
@@ -364,10 +364,10 @@ export function RadarTab() {
       //    behind the leading edge — gives the wide 90° fade-out look immediately.
       if (ctx.createConicGradient) {
         const grad = ctx.createConicGradient(sweepAngle, cx, cy);
-        grad.addColorStop(0, "rgba(0, 255, 65, 0.0)");
-        grad.addColorStop(0.0005, "rgba(0, 255, 65, 0.42)");
-        grad.addColorStop(trailRad / (Math.PI * 2), "rgba(0, 255, 65, 0.0)");
-        grad.addColorStop(1, "rgba(0, 255, 65, 0.0)");
+        grad.addColorStop(0, "rgba(0, 212, 255, 0.0)");
+        grad.addColorStop(0.0005, "rgba(0, 212, 255, 0.42)");
+        grad.addColorStop(trailRad / (Math.PI * 2), "rgba(0, 212, 255, 0.0)");
+        grad.addColorStop(1, "rgba(0, 212, 255, 0.0)");
         ctx.save();
         ctx.beginPath();
         ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
@@ -386,7 +386,7 @@ export function RadarTab() {
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(cx + Math.cos(sweepAngle) * maxR, cy + Math.sin(sweepAngle) * maxR);
-      ctx.strokeStyle = "#aaffbb";
+      ctx.strokeStyle = "#aaeeff";
       ctx.lineWidth = 2.5;
       ctx.shadowColor = GREEN;
       ctx.shadowBlur = 24;
@@ -522,17 +522,17 @@ export function RadarTab() {
   const reportCount = reports.length;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 relative bg-[#001208]">
+    <div className="flex-1 flex flex-col min-h-0 relative bg-[#000a12]">
       {/* Full-bleed canvas radar */}
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
         <canvas ref={canvasRef} className="absolute inset-0 block" />
 
         {/* HUD overlay — top */}
         <div className="absolute top-0 inset-x-0 px-4 py-3 flex items-start justify-between pointer-events-none">
-          <div className="text-[10px] tracking-[0.25em] text-[#00ff41]/80">
+          <div className="text-[10px] tracking-[0.25em] text-[#00d4ff]/80">
             ◉ {t(lang, "radar_title")}
           </div>
-          <div className="text-[10px] tracking-wider text-[#00ff41]/70 text-right">
+          <div className="text-[10px] tracking-wider text-[#00d4ff]/70 text-right">
             <div>RNG {RADIUS_KM}KM</div>
             <div className="tabular-nums">{reportCount} CONTACTS</div>
           </div>
@@ -540,7 +540,7 @@ export function RadarTab() {
 
         {/* HUD overlay — bottom-left coords */}
         {pos && (
-          <div className="absolute bottom-3 left-3 text-[10px] text-[#00ff41]/70 tracking-wider pointer-events-none tabular-nums">
+          <div className="absolute bottom-3 left-3 text-[10px] text-[#00d4ff]/70 tracking-wider pointer-events-none tabular-nums">
             <div>LAT {pos.lat.toFixed(4)}</div>
             <div>LON {pos.lon.toFixed(4)}</div>
             {posSource === "simulated" && (
@@ -552,9 +552,9 @@ export function RadarTab() {
         )}
 
         {/* HUD overlay — bottom-right status */}
-        <div className="absolute bottom-3 right-3 text-[10px] text-[#00ff41]/70 tracking-wider pointer-events-none">
+        <div className="absolute bottom-3 right-3 text-[10px] text-[#00d4ff]/70 tracking-wider pointer-events-none">
           {reportCount === 0 ? (
-            <span className="text-[#00ff41]/80">— {t(lang, "radar_empty")} —</span>
+            <span className="text-[#00d4ff]/80">— {t(lang, "radar_empty")} —</span>
           ) : (
             <span className="text-red-400 neda-blink">⚠ THREATS DETECTED</span>
           )}
@@ -562,9 +562,9 @@ export function RadarTab() {
       </div>
 
       {/* Action button */}
-      <div className="border-t border-[#00ff41]/20 p-3 bg-[#001208]">
+      <div className="border-t border-[#00d4ff]/20 p-3 bg-[#000a12]">
         {reportedAt && (
-          <div className="text-[11px] text-[#00ff41] uppercase mb-2 text-center neda-blink">
+          <div className="text-[11px] text-[#00d4ff] uppercase mb-2 text-center neda-blink">
             ✓ {t(lang, "reported")}
           </div>
         )}

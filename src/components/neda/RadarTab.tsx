@@ -820,11 +820,9 @@ export function RadarTab() {
               backgroundImage: `url(${radarMapBg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              WebkitMaskImage: "radial-gradient(circle at center, #000 55%, transparent 72%)",
-              maskImage: "radial-gradient(circle at center, #000 55%, transparent 72%)",
-              opacity: 0.12,
-              filter: "grayscale(1) contrast(1.1) brightness(0.9)",
-              mixBlendMode: "screen",
+              WebkitMaskImage: "radial-gradient(circle at center, #000 60%, transparent 75%)",
+              maskImage: "radial-gradient(circle at center, #000 60%, transparent 75%)",
+              opacity: 0.45,
             }}
           />
         </div>

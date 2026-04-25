@@ -71,7 +71,7 @@ export function ShareNeda({ onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/95 animate-in slide-in-from-bottom duration-300"
+      className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/95"
       role="dialog"
       aria-modal="true"
       aria-label="Share NEDA"

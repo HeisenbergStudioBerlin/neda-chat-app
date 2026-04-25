@@ -594,8 +594,6 @@ export function RadarTab() {
       rafRef.current = requestAnimationFrame(draw);
     };
 
-    let lastHudFrame = -1;
-
     rafRef.current = requestAnimationFrame(draw);
 
     return () => {

@@ -18,22 +18,72 @@ interface TavilyResponse {
   results?: TavilyResult[];
 }
 
-const SHUTDOWN_KEYWORDS = [
-  "shutdown",
-  "shut down",
-  "blackout",
-  "blocked",
-  "block",
-  "outage",
-  "throttl", // throttle, throttling, throttled
-  "censor",
-  "disrupt",
-  "cut off",
+// Two distinct keyword "groups" must match in the same result for it to count as
+// an active shutdown. This avoids false positives from generic news mentions.
+const KEYWORD_GROUPS: string[][] = [
+  ["shutdown", "shut down", "blackout", "outage", "cut off", "kill switch"],
+  ["block", "blocked", "censor", "throttl", "disrupt", "restrict"],
+  ["government", "regime", "authorities", "ministry", "state-ordered", "nationwide"],
+  ["internet", "mobile data", "broadband", "telecom", "isp", "network"],
 ];
 
-function looksLikeShutdown(text: string): boolean {
+// Untrusted / social sources — exclude these as primary evidence.
+const BLOCKED_DOMAINS = [
+  "instagram.com",
+  "twitter.com",
+  "x.com",
+  "facebook.com",
+  "reddit.com",
+  "tiktok.com",
+  "youtube.com",
+  "pinterest.com",
+  "t.me",
+];
+
+// Countries we consider safe for the demo — never trigger a shutdown banner.
+const SAFE_COUNTRIES = new Set(
+  [
+    "germany",
+    "deutschland",
+    "united states",
+    "usa",
+    "united kingdom",
+    "uk",
+    "france",
+    "spain",
+    "italy",
+    "netherlands",
+    "switzerland",
+    "austria",
+    "sweden",
+    "norway",
+    "denmark",
+    "finland",
+    "ireland",
+    "portugal",
+    "belgium",
+    "canada",
+    "australia",
+    "new zealand",
+    "japan",
+    "south korea",
+  ].map((c) => c.toLowerCase()),
+);
+
+function isBlockedSource(url?: string): boolean {
+  if (!url) return false;
+  const u = url.toLowerCase();
+  return BLOCKED_DOMAINS.some((d) => u.includes(d));
+}
+
+/** Count how many distinct keyword GROUPS appear in the text. */
+function shutdownScore(text: string): number {
   const t = text.toLowerCase();
-  return SHUTDOWN_KEYWORDS.some((kw) => t.includes(kw));
+  let score = 0;
+  for (const group of KEYWORD_GROUPS) {
+    if (group.some((kw) => t.includes(kw))) score += 1;
+  }
+  return score;
 }
 
 export const checkShutdown = createServerFn({ method: "POST" })

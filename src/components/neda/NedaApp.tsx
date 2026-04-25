@@ -5,6 +5,7 @@ import { MessagesTab } from "./MessagesTab";
 import { GroupsTab } from "./GroupsTab";
 import { RadarTab } from "./RadarTab";
 import { QRVerify } from "./QRVerify";
+import { ShutdownBanner } from "./ShutdownBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { t } from "@/lib/neda/i18n";
 import type { LangCode } from "@/lib/neda/countries";
@@ -106,6 +107,8 @@ export function NedaApp() {
           {panicMessage}
         </div>
       )}
+
+      <ShutdownBanner country={identity.country} />
 
       {/* Tabs */}
       <nav className="grid grid-cols-3 border-b border-border">

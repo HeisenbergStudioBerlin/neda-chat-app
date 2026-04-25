@@ -153,4 +153,12 @@
   .danger-pulse {
     animation: danger-pulse 1.4s ease-in-out infinite;
   }
+
+  @keyframes shutdown-pulse {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.25); }
+  }
+  .shutdown-pulse {
+    animation: shutdown-pulse 1.6s ease-in-out infinite;
+  }
 }

@@ -584,8 +584,16 @@ export function RadarTab() {
       }
       ctx.restore();
 
+      // Throttled HUD heading update (~5 Hz) so React doesn't re-render every frame.
+      if (headingTargetRef.current !== null && Math.floor(elapsed * 5) !== lastHudFrame) {
+        lastHudFrame = Math.floor(elapsed * 5);
+        setHeadingDisplay(Math.round(headingSmoothedRef.current));
+      }
+
       rafRef.current = requestAnimationFrame(draw);
     };
+
+    let lastHudFrame = -1;
 
     rafRef.current = requestAnimationFrame(draw);
 

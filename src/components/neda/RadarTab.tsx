@@ -795,7 +795,8 @@ export function RadarTab() {
     const tiles: Array<{ key: string; url: string; left: number; top: number }> = [];
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
-        const url = `https://tile.openstreetmap.org/${TILE_ZOOM}/${xi + dx}/${yi + dy}.png`;
+        // Carto Dark — already dark-blue styled, no CSS filter required, no CORS issues.
+        const url = `https://a.basemaps.cartocdn.com/dark_all/${TILE_ZOOM}/${xi + dx}/${yi + dy}@2x.png`;
         tiles.push({
           key: `${xi + dx}_${yi + dy}`,
           url,

@@ -774,10 +774,91 @@ export function RadarTab() {
 
   const reportCount = reports.length;
 
+  // Compute the 3×3 OSM tile grid centered on the user's position.
+  // Renders behind the canvas, dark-inverted via CSS filters.
+  const mapTiles = (() => {
+    if (!pos) return null;
+    const { x: tx, y: ty } = lonLatToTile(pos.lat, pos.lon, TILE_ZOOM);
+    const xi = Math.floor(tx);
+    const yi = Math.floor(ty);
+    // Sub-tile offset (0..1) of the user inside the central tile.
+    const offX = tx - xi;
+    const offY = ty - yi;
+    const TILE = 256;
+    // Translate the 3-tile strip so the user's exact pixel sits at center.
+    // Center = 1.5 tiles in; user is at xi + offX → shift by (offX - 0.5) tiles.
+    const shiftX = -(offX - 0.5) * TILE - TILE * 1.5;
+    const shiftY = -(offY - 0.5) * TILE - TILE * 1.5;
+    const tiles: Array<{ key: string; url: string; left: number; top: number }> = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const url = `https://tile.openstreetmap.org/${TILE_ZOOM}/${xi + dx}/${yi + dy}.png`;
+        tiles.push({
+          key: `${xi + dx}_${yi + dy}`,
+          url,
+          left: shiftX + (dx + 1) * TILE,
+          top: shiftY + (dy + 1) * TILE,
+        });
+      }
+    }
+    return tiles;
+  })();
+
   return (
     <div className="flex-1 flex flex-col min-h-0 relative bg-[#000a12]">
       {/* Full-bleed canvas radar */}
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
+        {/* OSM street map background — dark via CSS filters, masked to a circle. */}
+        {mapTiles && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            aria-hidden="true"
+            style={{
+              maskImage: "radial-gradient(circle at center, #000 60%, transparent 78%)",
+              WebkitMaskImage:
+                "radial-gradient(circle at center, #000 60%, transparent 78%)",
+            }}
+          >
+            <div
+              className="absolute"
+              style={{
+                left: "50%",
+                top: "50%",
+                width: 0,
+                height: 0,
+                filter:
+                  "invert(0.92) hue-rotate(170deg) saturate(0.55) brightness(0.85) contrast(1.1)",
+                opacity: 0.55,
+              }}
+            >
+              {mapTiles.map((tile) => (
+                <img
+                  key={tile.key}
+                  src={tile.url}
+                  alt=""
+                  width={256}
+                  height={256}
+                  loading="lazy"
+                  draggable={false}
+                  style={{
+                    position: "absolute",
+                    left: `${tile.left}px`,
+                    top: `${tile.top}px`,
+                    width: 256,
+                    height: 256,
+                    imageRendering: "pixelated",
+                  }}
+                />
+              ))}
+            </div>
+            {/* Dark wash so the map only faintly shows through, matching radar bg. */}
+            <div
+              className="absolute inset-0"
+              style={{ backgroundColor: "rgba(0, 10, 18, 0.78)" }}
+            />
+          </div>
+        )}
+
         <canvas ref={canvasRef} className="absolute inset-0 block" />
 
         {/* HUD overlay — top */}
@@ -785,9 +866,10 @@ export function RadarTab() {
           <div className="text-[10px] tracking-[0.25em] text-[#00d4ff]/80">
             ◉ {t(lang, "radar_title")}
           </div>
-          <div className="text-[10px] tracking-wider text-[#00d4ff]/70 text-right">
-            <div>RNG {RADIUS_KM}KM</div>
-            <div className="tabular-nums">{reportCount} CONTACTS</div>
+          <div className="text-[10px] tracking-wider text-right tabular-nums leading-tight">
+            <div className="text-[#00d4ff]/70">RNG {RADIUS_KM}KM</div>
+            <div className="text-red-400">⚠ {simStats.threats + reportCount} THREATS</div>
+            <div className="text-[#00d4ff]">◉ {simStats.peers} PEERS</div>
           </div>
         </div>
 
@@ -808,8 +890,8 @@ export function RadarTab() {
         )}
 
         {/* HUD overlay — bottom-right status */}
-        <div className="absolute bottom-3 right-3 text-[10px] text-[#00d4ff]/70 tracking-wider pointer-events-none">
-          {reportCount === 0 ? (
+        <div className="absolute bottom-3 right-3 text-[10px] tracking-wider pointer-events-none">
+          {(simStats.threats + reportCount) === 0 ? (
             <span className="text-[#00d4ff]/80">— {t(lang, "radar_empty")} —</span>
           ) : (
             <span className="text-red-400 neda-blink">⚠ THREATS DETECTED</span>

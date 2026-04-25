@@ -14,7 +14,186 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      danger_reports: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          latitude: number
+          longitude: number
+          reporter_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          reporter_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          reporter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "danger_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_members: {
+        Row: {
+          group_id: string
+          id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          country: string | null
+          created_at: string
+          id: string
+          is_custom: boolean
+          name: string
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          is_custom?: boolean
+          name: string
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          is_custom?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          group_id: string | null
+          id: string
+          original_language: string
+          recipient_id: string | null
+          sender_id: string
+          translated_content: Json
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          original_language?: string
+          recipient_id?: string | null
+          sender_id: string
+          translated_content?: Json
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          original_language?: string
+          recipient_id?: string | null
+          sender_id?: string
+          translated_content?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          bluetooth_enabled: boolean
+          country: string
+          created_at: string
+          display_name: string | null
+          id: string
+          language: string
+          user_code: string
+        }
+        Insert: {
+          bluetooth_enabled?: boolean
+          country: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          language?: string
+          user_code: string
+        }
+        Update: {
+          bluetooth_enabled?: boolean
+          country?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          language?: string
+          user_code?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -36,6 +36,7 @@ export function ChatView({ peerId, peerCode, groupId, groupName, onBack }: Props
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [pulseIds, setPulseIds] = useState<Set<string>>(new Set());
+  const [senderCodes, setSenderCodes] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const lang: LangCode = (identity?.language ?? "en") as LangCode;

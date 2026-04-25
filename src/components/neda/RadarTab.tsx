@@ -277,6 +277,7 @@ export function RadarTab() {
 
     const start = performance.now();
     let lastT = start;
+    let lastHudFrame = -1;
 
     const draw = (t: number) => {
       const elapsed = (t - start) / 1000;

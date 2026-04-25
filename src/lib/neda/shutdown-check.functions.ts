@@ -96,6 +96,16 @@ export const checkShutdown = createServerFn({ method: "POST" })
     const apiKey = process.env.TAVILY_API_KEY;
     const lastChecked = new Date().toISOString();
 
+    // Demo guard: never raise the alarm for safe / democratic countries.
+    if (SAFE_COUNTRIES.has(data.country.toLowerCase())) {
+      return {
+        active: false,
+        headline: "no shutdown reported",
+        source: "",
+        lastChecked,
+      };
+    }
+
     if (!apiKey) {
       return {
         active: false,
@@ -115,7 +125,7 @@ export const checkShutdown = createServerFn({ method: "POST" })
         body: JSON.stringify({
           query,
           api_key: apiKey,
-          max_results: 3,
+          max_results: 6,
           include_answer: true,
           search_depth: "basic",
         }),
@@ -134,9 +144,13 @@ export const checkShutdown = createServerFn({ method: "POST" })
       const json = (await res.json()) as TavilyResponse;
       const results = json.results ?? [];
 
-      const hit = results.find((r) =>
-        looksLikeShutdown(`${r.title ?? ""} ${r.content ?? ""}`),
-      );
+      // Require: trusted source AND ≥2 distinct keyword groups in the same result.
+      const MIN_GROUPS = 2;
+      const hit = results.find((r) => {
+        if (isBlockedSource(r.url)) return false;
+        const score = shutdownScore(`${r.title ?? ""} ${r.content ?? ""}`);
+        return score >= MIN_GROUPS;
+      });
 
       if (hit) {
         const headline = (hit.title ?? json.answer ?? "Internet shutdown reported")
@@ -149,10 +163,11 @@ export const checkShutdown = createServerFn({ method: "POST" })
         };
       }
 
+      const firstTrusted = results.find((r) => !isBlockedSource(r.url));
       return {
         active: false,
         headline: json.answer?.slice(0, 180) ?? "no shutdown reported",
-        source: results[0]?.url ?? "",
+        source: firstTrusted?.url ?? "",
         lastChecked,
       };
     } catch (err) {

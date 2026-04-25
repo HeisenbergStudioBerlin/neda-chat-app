@@ -52,22 +52,22 @@ export function QRVerify({ myCode, myId, onClose, onPeerVerified }: Props) {
       aria-modal="true"
       aria-label="Verify"
     >
-      <div className="w-full max-w-md mx-auto flex flex-col bg-[#0a0a0a] text-[#00ff41] font-mono">
+      <div className="w-full max-w-md mx-auto flex flex-col bg-[#0a0a0a] text-[#00d4ff] font-mono">
         {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-[#00ff41]/30">
+        <header className="flex items-center justify-between px-4 py-3 border-b border-[#00d4ff]/30">
           <div className="text-sm tracking-[0.3em] font-bold">VERIFIZIEREN</div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="w-8 h-8 flex items-center justify-center border border-[#00ff41]/40 hover:bg-[#00ff41]/10 text-lg"
+            className="w-8 h-8 flex items-center justify-center border border-[#00d4ff]/40 hover:bg-[#00d4ff]/10 text-lg"
           >
             ×
           </button>
         </header>
 
         {/* Tabs */}
-        <nav className="grid grid-cols-2 border-b border-[#00ff41]/30">
+        <nav className="grid grid-cols-2 border-b border-[#00d4ff]/30">
           {(["my", "scan"] as const).map((id) => (
             <button
               key={id}
@@ -75,8 +75,8 @@ export function QRVerify({ myCode, myId, onClose, onPeerVerified }: Props) {
               onClick={() => setTab(id)}
               className={`px-3 py-2 text-[11px] uppercase tracking-wider transition-colors ${
                 tab === id
-                  ? "text-[#00ff41] border-b-2 border-[#00ff41]"
-                  : "text-[#00ff41]/40 border-b-2 border-transparent"
+                  ? "text-[#00d4ff] border-b-2 border-[#00d4ff]"
+                  : "text-[#00d4ff]/40 border-b-2 border-transparent"
               }`}
             >
               {id === "my" ? "My QR" : "Scan"}
@@ -103,10 +103,10 @@ export function QRVerify({ myCode, myId, onClose, onPeerVerified }: Props) {
 function MyQRPanel({ code, qrDataUrl }: { code: string; qrDataUrl: string | null }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-6">
-      <div className="text-[11px] uppercase tracking-[0.25em] text-[#00ff41]/80">
+      <div className="text-[11px] uppercase tracking-[0.25em] text-[#00d4ff]/80">
         scannen zur verifizierung
       </div>
-      <div className="bg-white rounded-2xl p-5 shadow-[0_0_40px_rgba(0,255,65,0.15)]">
+      <div className="bg-white rounded-2xl p-5 shadow-[0_0_40px_rgba(0,212,255,0.15)]">
         {qrDataUrl ? (
           <img
             src={qrDataUrl}
@@ -122,8 +122,8 @@ function MyQRPanel({ code, qrDataUrl }: { code: string; qrDataUrl: string | null
         )}
       </div>
       <div className="flex flex-col items-center gap-1">
-        <div className="text-lg tracking-widest text-[#00ff41]">{code}</div>
-        <div className="text-[10px] tracking-[0.4em] text-[#00ff41]/50 uppercase">neda</div>
+        <div className="text-lg tracking-widest text-[#00d4ff]">{code}</div>
+        <div className="text-[10px] tracking-[0.4em] text-[#00d4ff]/50 uppercase">neda</div>
       </div>
     </div>
   );
@@ -265,12 +265,12 @@ function ScanPanel({ myId, myCode, onPeerVerified }: ScanPanelProps) {
 
   return (
     <div className="flex-1 flex flex-col gap-4">
-      <div className="text-[11px] uppercase tracking-[0.25em] text-[#00ff41]/80 text-center">
+      <div className="text-[11px] uppercase tracking-[0.25em] text-[#00d4ff]/80 text-center">
         scan a neda qr code
       </div>
 
       {!error && (
-        <div className="relative mx-auto w-full max-w-[320px] aspect-square rounded-2xl overflow-hidden bg-black border border-[#00ff41]/30 shadow-[0_0_40px_rgba(0,255,65,0.15)]">
+        <div className="relative mx-auto w-full max-w-[320px] aspect-square rounded-2xl overflow-hidden bg-black border border-[#00d4ff]/30 shadow-[0_0_40px_rgba(0,212,255,0.15)]">
           <video
             ref={videoRef}
             className="absolute inset-0 w-full h-full object-cover"
@@ -282,21 +282,21 @@ function ScanPanel({ myId, myCode, onPeerVerified }: ScanPanelProps) {
           {/* Scan frame overlay */}
           <div className="absolute inset-0 pointer-events-none">
             {/* Corners */}
-            <div className="absolute top-3 left-3 w-8 h-8 border-t-2 border-l-2 border-[#00ff41]" />
-            <div className="absolute top-3 right-3 w-8 h-8 border-t-2 border-r-2 border-[#00ff41]" />
-            <div className="absolute bottom-3 left-3 w-8 h-8 border-b-2 border-l-2 border-[#00ff41]" />
-            <div className="absolute bottom-3 right-3 w-8 h-8 border-b-2 border-r-2 border-[#00ff41]" />
+            <div className="absolute top-3 left-3 w-8 h-8 border-t-2 border-l-2 border-[#00d4ff]" />
+            <div className="absolute top-3 right-3 w-8 h-8 border-t-2 border-r-2 border-[#00d4ff]" />
+            <div className="absolute bottom-3 left-3 w-8 h-8 border-b-2 border-l-2 border-[#00d4ff]" />
+            <div className="absolute bottom-3 right-3 w-8 h-8 border-b-2 border-r-2 border-[#00d4ff]" />
             {/* Sweep line */}
-            <div className="qr-scan-sweep absolute left-3 right-3 h-[2px] bg-[#00ff41] shadow-[0_0_12px_#00ff41]" />
+            <div className="qr-scan-sweep absolute left-3 right-3 h-[2px] bg-[#00d4ff] shadow-[0_0_12px_#00d4ff]" />
           </div>
 
           {!cameraReady && (
-            <div className="absolute inset-0 flex items-center justify-center text-[10px] uppercase tracking-[0.3em] text-[#00ff41]/60">
+            <div className="absolute inset-0 flex items-center justify-center text-[10px] uppercase tracking-[0.3em] text-[#00d4ff]/60">
               starting camera...
             </div>
           )}
           {verifying && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs uppercase tracking-[0.3em] text-[#00ff41]">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs uppercase tracking-[0.3em] text-[#00d4ff]">
               verifying...
             </div>
           )}
@@ -304,14 +304,14 @@ function ScanPanel({ myId, myCode, onPeerVerified }: ScanPanelProps) {
       )}
 
       {error && (
-        <div className="mx-auto w-full max-w-[320px] aspect-square rounded-2xl border border-dashed border-[#00ff41]/40 flex items-center justify-center text-[11px] tracking-[0.3em] text-[#00ff41]/70 uppercase">
+        <div className="mx-auto w-full max-w-[320px] aspect-square rounded-2xl border border-dashed border-[#00d4ff]/40 flex items-center justify-center text-[11px] tracking-[0.3em] text-[#00d4ff]/70 uppercase">
           {error}
         </div>
       )}
 
       {/* Manual entry (always visible as fallback / quick option) */}
-      <div className="flex flex-col gap-2 pt-2 border-t border-[#00ff41]/20">
-        <label className="text-[10px] uppercase tracking-[0.3em] text-[#00ff41]/60">
+      <div className="flex flex-col gap-2 pt-2 border-t border-[#00d4ff]/20">
+        <label className="text-[10px] uppercase tracking-[0.3em] text-[#00d4ff]/60">
           {error ? "enter @name manually" : "or enter manually"}
         </label>
         <div className="flex gap-2">
@@ -321,13 +321,13 @@ function ScanPanel({ myId, myCode, onPeerVerified }: ScanPanelProps) {
               setManualCode(e.target.value.toLowerCase().replace(/\s/g, ""))
             }
             placeholder="@sam4805"
-            className="flex-1 bg-transparent border border-[#00ff41]/40 px-3 py-2 outline-none focus:border-[#00ff41] text-[#00ff41] placeholder:text-[#00ff41]/30 text-sm"
+            className="flex-1 bg-transparent border border-[#00d4ff]/40 px-3 py-2 outline-none focus:border-[#00d4ff] text-[#00d4ff] placeholder:text-[#00d4ff]/30 text-sm"
           />
           <button
             type="button"
             onClick={submitManual}
             disabled={verifying}
-            className="px-4 py-2 border border-[#00ff41] text-[#00ff41] text-[11px] uppercase tracking-wider hover:bg-[#00ff41]/10 disabled:opacity-30"
+            className="px-4 py-2 border border-[#00d4ff] text-[#00d4ff] text-[11px] uppercase tracking-wider hover:bg-[#00d4ff]/10 disabled:opacity-30"
           >
             go
           </button>

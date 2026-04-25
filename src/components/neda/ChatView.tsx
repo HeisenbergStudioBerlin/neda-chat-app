@@ -5,6 +5,7 @@ import { translateMessage } from "@/lib/neda/translate.functions";
 import { notifyIncoming } from "@/lib/neda/notify";
 import { isRTL, type LangCode } from "@/lib/neda/countries";
 import { t } from "@/lib/neda/i18n";
+import { simulatedHopCount } from "@/lib/mesh/protocol";
 
 export interface ChatMessage {
   id: string;

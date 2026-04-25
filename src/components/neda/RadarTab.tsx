@@ -364,7 +364,7 @@ export function RadarTab() {
     const GREEN_DIM = "rgba(0, 212, 255, 0.25)";
     const GREEN_FAINT = "rgba(0, 212, 255, 0.12)";
     const GREEN_LABEL = "rgba(0, 212, 255, 0.55)";
-    const BG_WASH = "rgba(0, 10, 18, 0.46)";
+    const BG_WASH = "rgba(0, 10, 18, 0.18)";
     const RED = "#ff2b2b";
 
     const start = performance.now();

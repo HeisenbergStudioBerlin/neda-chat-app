@@ -21,9 +21,40 @@ interface ReportWithDistance extends DangerReport {
 
 const RADIUS_KM = 5; // visible scope of the radar disc.
 const MAX_REPORT_KM = 50; // we still pull within 50km, but plot at edge if outside disc.
+const TILE_ZOOM = 13; // OSM zoom level — ~5km radius fits well at z13.
 
 // Tehran fallback for demo when GPS is unavailable (e.g. Lovable preview iframe).
 const FALLBACK_POS = { lat: 35.6892, lon: 51.389 };
+
+// ---- Simulated contacts (demo / hackathon) ----
+interface SimContact {
+  id: string;
+  kind: "threat" | "peer";
+  /** offset from user in km (north +, east +) */
+  dx: number;
+  dy: number;
+  /** seconds since app start when it appeared */
+  bornAt: number;
+  /** total lifetime in seconds */
+  life: number;
+}
+
+function randomInRadius(maxKm: number): { dx: number; dy: number } {
+  const r = Math.sqrt(Math.random()) * maxKm * 0.95;
+  const a = Math.random() * Math.PI * 2;
+  return { dx: Math.cos(a) * r, dy: Math.sin(a) * r };
+}
+
+/** Convert a lat/lon to an OSM tile (x,y,z) at integer zoom. */
+function lonLatToTile(lat: number, lon: number, z: number) {
+  const n = 2 ** z;
+  const xt = ((lon + 180) / 360) * n;
+  const latRad = (lat * Math.PI) / 180;
+  const yt =
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
+  return { x: xt, y: yt, z };
+}
+
 
 function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const R = 6371;

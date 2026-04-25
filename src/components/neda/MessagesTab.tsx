@@ -216,7 +216,7 @@ export function MessagesTab() {
           <input
             autoFocus
             value={newCode}
-            onChange={(e) => setNewCode(e.target.value.toUpperCase())}
+            onChange={(e) => setNewCode(e.target.value.toLowerCase().replace(/\s/g, ""))}
             placeholder={t(lang, "enter_user_id")}
             className="bg-transparent border border-border px-3 py-2 outline-none focus:border-signal"
           />

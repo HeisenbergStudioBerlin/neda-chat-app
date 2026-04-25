@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useIdentity } from "@/hooks/use-identity";
 import { t } from "@/lib/neda/i18n";
 import type { LangCode } from "@/lib/neda/countries";
+import radarMapBg from "@/assets/radar-map.png";
 
 interface DangerReport {
   id: string;
@@ -808,6 +809,26 @@ export function RadarTab() {
     <div className="flex-1 flex flex-col min-h-0 relative bg-[#000a12]">
       {/* Full-bleed canvas radar */}
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
+        {/* Subtle decorative city-map texture, masked to the radar disc only. */}
+        <div
+          className="absolute inset-0 pointer-events-none flex items-center justify-center"
+          aria-hidden="true"
+        >
+          <div
+            className="aspect-square h-full max-h-full"
+            style={{
+              backgroundImage: `url(${radarMapBg})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              WebkitMaskImage: "radial-gradient(circle at center, #000 55%, transparent 72%)",
+              maskImage: "radial-gradient(circle at center, #000 55%, transparent 72%)",
+              opacity: 0.12,
+              filter: "grayscale(1) contrast(1.1) brightness(0.9)",
+              mixBlendMode: "screen",
+            }}
+          />
+        </div>
+
         {/* OSM street map background — dark via CSS filters, masked to a circle. */}
         {mapTiles && (
           <div

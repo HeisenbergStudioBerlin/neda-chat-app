@@ -364,7 +364,7 @@ export function RadarTab() {
     const GREEN_DIM = "rgba(0, 212, 255, 0.25)";
     const GREEN_FAINT = "rgba(0, 212, 255, 0.12)";
     const GREEN_LABEL = "rgba(0, 212, 255, 0.55)";
-    const BG_WASH = "rgba(0, 10, 18, 0.46)";
+    const BG_WASH = "rgba(0, 10, 18, 0.18)";
     const RED = "#ff2b2b";
 
     const start = performance.now();
@@ -795,7 +795,8 @@ export function RadarTab() {
     const tiles: Array<{ key: string; url: string; left: number; top: number }> = [];
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
-        const url = `https://tile.openstreetmap.org/${TILE_ZOOM}/${xi + dx}/${yi + dy}.png`;
+        // Carto Dark — already dark-blue styled, no CSS filter required, no CORS issues.
+        const url = `https://a.basemaps.cartocdn.com/dark_all/${TILE_ZOOM}/${xi + dx}/${yi + dy}@2x.png`;
         tiles.push({
           key: `${xi + dx}_${yi + dy}`,
           url,
@@ -811,76 +812,65 @@ export function RadarTab() {
     <div className="flex-1 flex flex-col min-h-0 relative bg-[#000a12]">
       {/* Full-bleed canvas radar */}
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
-        {/* Subtle decorative city-map texture, masked to the radar disc only. */}
-        <div
-          className="absolute inset-0 pointer-events-none flex items-center justify-center"
-          aria-hidden="true"
-        >
-          <div
-            className="aspect-square h-full max-h-full"
-            style={{
-              backgroundImage: `url(${radarMapBg})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              WebkitMaskImage: "radial-gradient(circle at center, #000 60%, transparent 75%)",
-              maskImage: "radial-gradient(circle at center, #000 60%, transparent 75%)",
-              opacity: 0.45,
-            }}
-          />
-        </div>
-
-        {/* OSM street map background — dark via CSS filters, masked to a circle. */}
+        {/* Carto Dark street-map tiles — clipped to a perfect circle behind the radar. */}
         {mapTiles && (
           <div
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-0 pointer-events-none flex items-center justify-center"
             aria-hidden="true"
-            style={{
-              maskImage: "radial-gradient(circle at center, #000 60%, transparent 78%)",
-              WebkitMaskImage:
-                "radial-gradient(circle at center, #000 60%, transparent 78%)",
-            }}
+            style={{ zIndex: 1 }}
           >
             <div
-              className="absolute"
+              className="relative aspect-square h-full max-h-full"
               style={{
-                left: "50%",
-                top: "50%",
-                width: 0,
-                height: 0,
-                filter:
-                  "invert(0.92) hue-rotate(170deg) saturate(0.55) brightness(0.85) contrast(1.1)",
-                opacity: 0.55,
+                clipPath: "circle(50% at 50% 50%)",
+                WebkitClipPath: "circle(50% at 50% 50%)",
               }}
             >
-              {mapTiles.map((tile) => (
-                <img
-                  key={tile.key}
-                  src={tile.url}
-                  alt=""
-                  width={256}
-                  height={256}
-                  loading="lazy"
-                  draggable={false}
-                  style={{
-                    position: "absolute",
-                    left: `${tile.left}px`,
-                    top: `${tile.top}px`,
-                    width: 256,
-                    height: 256,
-                    imageRendering: "pixelated",
-                  }}
-                />
-              ))}
+              {/* Tile grid, anchored to user position at the center */}
+              <div
+                className="absolute"
+                style={{
+                  left: "50%",
+                  top: "50%",
+                  width: 0,
+                  height: 0,
+                  opacity: 0.85,
+                }}
+              >
+                {mapTiles.map((tile) => (
+                  <img
+                    key={tile.key}
+                    src={tile.url}
+                    alt=""
+                    width={256}
+                    height={256}
+                    loading="lazy"
+                    draggable={false}
+                    style={{
+                      position: "absolute",
+                      left: `${tile.left}px`,
+                      top: `${tile.top}px`,
+                      width: 256,
+                      height: 256,
+                    }}
+                  />
+                ))}
+              </div>
+              {/* Subtle wash so streets read as faint texture, not foreground content. */}
+              <div
+                className="absolute inset-0"
+                style={{ backgroundColor: "rgba(0, 10, 18, 0.4)" }}
+              />
             </div>
-            {/* Dark wash so the map only faintly shows through, matching radar bg. */}
-            <div
-              className="absolute inset-0"
-              style={{ backgroundColor: "rgba(0, 10, 18, 0.78)" }}
-            />
           </div>
         )}
 
-        <canvas ref={canvasRef} className="absolute inset-0 block" />
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 block"
+          style={{ zIndex: 2 }}
+        />
+
 
         {/* HUD overlay — top */}
         <div className="absolute top-0 inset-x-0 px-4 py-3 flex items-start justify-between pointer-events-none">

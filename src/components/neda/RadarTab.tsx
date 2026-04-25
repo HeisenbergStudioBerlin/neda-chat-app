@@ -177,6 +177,11 @@ export function RadarTab() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Persistent phosphor layer — accumulates the sweep glow and slowly fades.
+    const phosphor = document.createElement("canvas");
+    const pctx = phosphor.getContext("2d");
+    if (!pctx) return;
+
     let width = 0;
     let height = 0;
     let dpr = window.devicePixelRatio || 1;
@@ -191,6 +196,12 @@ export function RadarTab() {
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // Match phosphor buffer to canvas (logical px — we'll draw in CSS units).
+      phosphor.width = Math.floor(width * dpr);
+      phosphor.height = Math.floor(height * dpr);
+      pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      pctx.clearRect(0, 0, width, height);
     };
     resize();
     const ro = new ResizeObserver(resize);

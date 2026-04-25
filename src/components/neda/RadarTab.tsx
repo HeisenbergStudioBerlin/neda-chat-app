@@ -177,6 +177,11 @@ export function RadarTab() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Persistent phosphor layer — accumulates the sweep glow and slowly fades.
+    const phosphor = document.createElement("canvas");
+    const pctx = phosphor.getContext("2d");
+    if (!pctx) return;
+
     let width = 0;
     let height = 0;
     let dpr = window.devicePixelRatio || 1;
@@ -191,6 +196,12 @@ export function RadarTab() {
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // Match phosphor buffer to canvas (logical px — we'll draw in CSS units).
+      phosphor.width = Math.floor(width * dpr);
+      phosphor.height = Math.floor(height * dpr);
+      pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      pctx.clearRect(0, 0, width, height);
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -204,11 +215,14 @@ export function RadarTab() {
     const RED = "#ff2b2b";
 
     const start = performance.now();
+    let lastT = start;
 
     const draw = (t: number) => {
       const elapsed = (t - start) / 1000;
+      const dt = Math.min(0.1, (t - lastT) / 1000);
+      lastT = t;
 
-      // Background — dark green/black with subtle vignette.
+      // Background — dark green/black.
       ctx.fillStyle = BG;
       ctx.fillRect(0, 0, width, height);
 
@@ -216,10 +230,25 @@ export function RadarTab() {
       const cy = height / 2;
       const maxR = Math.min(width, height) / 2 - 12;
 
+      // Fine grid network across the whole canvas (CRT feel).
+      ctx.strokeStyle = "rgba(0, 255, 65, 0.06)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const GRID = 22;
+      for (let x = (cx % GRID); x < width; x += GRID) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+      }
+      for (let y = (cy % GRID); y < height; y += GRID) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+      }
+      ctx.stroke();
+
       // Outer disc fill (slightly lighter than bg).
       ctx.beginPath();
       ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(0, 40, 18, 0.6)";
+      ctx.fillStyle = "rgba(0, 40, 18, 0.55)";
       ctx.fill();
 
       // Concentric rings: 1km, 2km, 5km (relative to RADIUS_KM scope).
@@ -291,20 +320,58 @@ export function RadarTab() {
       ctx.fillText("E", cx + maxR + 4, cy);
       ctx.fillText("W", cx - maxR - 4, cy);
 
-      // Sweep line (clockwise, ~4s per rotation), with a fading trail wedge.
+      // ---------- SWEEP + PHOSPHOR TRAIL ----------
+      // Sweep angle (clockwise, ~4s per rotation), 0 = north (-π/2).
       const sweepAngle = (elapsed * (Math.PI * 2)) / 4 - Math.PI / 2;
-      const trailRad = Math.PI / 3; // 60° trail.
+      const trailRad = (Math.PI * 90) / 180; // 90° wide trail.
 
-      const grad = ctx.createConicGradient
-        ? ctx.createConicGradient(sweepAngle, cx, cy)
-        : null;
-      if (grad) {
-        // Trail fades from bright (at sweep angle going backwards) to transparent.
+      // 1) Fade the persistent phosphor layer slightly each frame (CRT decay).
+      pctx.save();
+      pctx.globalCompositeOperation = "destination-out";
+      // Decay rate tuned so trail fully fades over ~1s (matches 90° at 4s/rev).
+      pctx.fillStyle = `rgba(0, 0, 0, ${Math.min(0.5, dt * 1.1)})`;
+      pctx.fillRect(0, 0, width, height);
+      pctx.restore();
+
+      // 2) Paint a fresh wedge into the phosphor layer at the sweep's leading edge,
+      //    clipped to the radar disc, with a radial soft edge.
+      pctx.save();
+      pctx.beginPath();
+      pctx.arc(cx, cy, maxR, 0, Math.PI * 2);
+      pctx.clip();
+
+      // Narrow, bright leading wedge (the "fresh" phosphor excitation).
+      const leadWedge = (Math.PI * 6) / 180; // 6° leading slice
+      pctx.beginPath();
+      pctx.moveTo(cx, cy);
+      pctx.arc(cx, cy, maxR, sweepAngle - leadWedge, sweepAngle);
+      pctx.closePath();
+      // Radial gradient: dim at center, bright at rim (more energy at scan edge).
+      const radial = pctx.createRadialGradient(cx, cy, maxR * 0.1, cx, cy, maxR);
+      radial.addColorStop(0, "rgba(0, 255, 65, 0.05)");
+      radial.addColorStop(1, "rgba(0, 255, 65, 0.55)");
+      pctx.fillStyle = radial;
+      pctx.fill();
+      pctx.restore();
+
+      // 3) Composite phosphor layer onto main canvas (additive-ish via lighter).
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.drawImage(phosphor, 0, 0, width, height);
+      ctx.restore();
+
+      // 4) Optional extra conic-gradient "afterglow" wedge for visible width
+      //    behind the leading edge — gives the wide 90° fade-out look immediately.
+      if (ctx.createConicGradient) {
+        const grad = ctx.createConicGradient(sweepAngle, cx, cy);
         grad.addColorStop(0, "rgba(0, 255, 65, 0.0)");
-        grad.addColorStop(0.001, "rgba(0, 255, 65, 0.55)");
+        grad.addColorStop(0.0005, "rgba(0, 255, 65, 0.42)");
         grad.addColorStop(trailRad / (Math.PI * 2), "rgba(0, 255, 65, 0.0)");
         grad.addColorStop(1, "rgba(0, 255, 65, 0.0)");
         ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
+        ctx.clip();
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.arc(cx, cy, maxR, sweepAngle - trailRad, sweepAngle);
@@ -312,27 +379,22 @@ export function RadarTab() {
         ctx.fillStyle = grad;
         ctx.fill();
         ctx.restore();
-      } else {
-        // Fallback for browsers without conic gradient.
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, maxR, sweepAngle - trailRad, sweepAngle);
-        ctx.closePath();
-        ctx.fillStyle = "rgba(0, 255, 65, 0.18)";
-        ctx.fill();
-        ctx.restore();
       }
 
-      // Bright leading sweep line.
+      // 5) Bright leading sweep line — strong glow, like a beam of light.
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(cx + Math.cos(sweepAngle) * maxR, cy + Math.sin(sweepAngle) * maxR);
-      ctx.strokeStyle = GREEN;
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#aaffbb";
+      ctx.lineWidth = 2.5;
       ctx.shadowColor = GREEN;
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 24;
+      ctx.stroke();
+      // Inner hot core
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+      ctx.lineWidth = 1;
       ctx.stroke();
       ctx.restore();
 
@@ -363,39 +425,52 @@ export function RadarTab() {
         const px = cx + Math.cos(a) * r;
         const py = cy + Math.sin(a) * r;
 
-        // Highlight when sweep passes by (within ~20°).
+        // Sweep flash: brightest right as the beam crosses, decays over ~1.2s.
+        // angleFromSweep > 0 means sweep already passed (in trail direction).
         let angleFromSweep = ((a - sweepAngle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-        // Normalize so brightest right after sweep passes (going backwards in trail direction).
         if (angleFromSweep > Math.PI) angleFromSweep -= Math.PI * 2;
-        const sweepProximity = Math.max(
-          0,
-          1 - Math.abs(angleFromSweep) / (Math.PI / 9), // 20° window
-        );
+
+        // Time (s) since the sweep last hit this bearing (sweep does 2π in 4s → π/2 rad/s).
+        // If beam not yet reached, treat as "long ago" (no flash).
+        const radPerSec = (Math.PI * 2) / 4;
+        const timeSinceHit = angleFromSweep >= 0 ? angleFromSweep / radPerSec : 999;
+        // Flash envelope: 1 at hit, exponential decay, gone after ~1.2s.
+        const flash = Math.max(0, Math.exp(-timeSinceHit * 2.2));
 
         const baseSize = edge ? 3 : 4 + Math.min(6, c.count * 1.5);
-        const localPulse = (Math.sin(elapsed * 4 + c.distanceKm) + 1) / 2;
-        const alpha = edge ? 0.45 : 0.7 + sweepProximity * 0.3;
+        const localPulse = (Math.sin(elapsed * 5 + c.distanceKm * 2) + 1) / 2;
+        const alpha = edge ? 0.45 + flash * 0.4 : 0.55 + flash * 0.45;
 
         ctx.save();
         ctx.shadowColor = RED;
-        ctx.shadowBlur = 14 + sweepProximity * 16;
+        ctx.shadowBlur = 12 + flash * 28;
         ctx.fillStyle = `rgba(255, 43, 43, ${alpha})`;
         ctx.beginPath();
-        ctx.arc(px, py, baseSize, 0, Math.PI * 2);
+        ctx.arc(px, py, baseSize + flash * 2, 0, Math.PI * 2);
         ctx.fill();
-        // Outer pulse ring.
-        ctx.globalAlpha = (0.35 + sweepProximity * 0.35) * (1 - localPulse);
+
+        // Bright hot core during flash.
+        if (flash > 0.3) {
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = `rgba(255, 220, 220, ${flash * 0.9})`;
+          ctx.beginPath();
+          ctx.arc(px, py, baseSize * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Continuous pulse ring (always visible, stronger right after flash).
+        ctx.globalAlpha = (0.35 + flash * 0.5) * (1 - localPulse);
         ctx.strokeStyle = RED;
         ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 8;
         ctx.beginPath();
-        ctx.arc(px, py, baseSize + 4 + localPulse * 8, 0, Math.PI * 2);
+        ctx.arc(px, py, baseSize + 4 + localPulse * 10, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
 
         // Cluster count badge.
         if (c.count > 1) {
           ctx.save();
-          ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
           ctx.font = "bold 9px 'IBM Plex Mono', monospace";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";

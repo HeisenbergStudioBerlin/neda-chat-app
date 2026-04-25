@@ -4,6 +4,7 @@ import { Onboarding } from "./Onboarding";
 import { MessagesTab } from "./MessagesTab";
 import { GroupsTab } from "./GroupsTab";
 import { RadarTab } from "./RadarTab";
+import { QRVerify } from "./QRVerify";
 import { supabase } from "@/integrations/supabase/client";
 import { t } from "@/lib/neda/i18n";
 import type { LangCode } from "@/lib/neda/countries";
@@ -15,6 +16,8 @@ export function NedaApp() {
   const [tab, setTab] = useState<Tab>("messages");
   const [titleTaps, setTitleTaps] = useState(0);
   const [panicMessage, setPanicMessage] = useState<string | null>(null);
+  const [showQR, setShowQR] = useState(false);
+  const [pendingPeer, setPendingPeer] = useState<{ peerId: string; peerCode: string } | null>(null);
 
   // Reset taps after a window.
   useEffect(() => {
@@ -67,11 +70,29 @@ export function NedaApp() {
         >
           N E D A
         </button>
-        <div className="text-[10px] tracking-wider text-muted-foreground">
-          {identity.user_code}
-          {identity.display_name && (
-            <span className="ms-2 text-foreground/60">· {identity.display_name}</span>
-          )}
+        <div className="flex items-center gap-3 text-[10px] tracking-wider text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => setShowQR(true)}
+            aria-label="Verify via QR"
+            className="w-7 h-7 flex items-center justify-center border border-signal/40 text-signal hover:bg-signal/10 transition-colors"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <rect x="14" y="14" width="3" height="3" />
+              <rect x="18" y="14" width="3" height="3" />
+              <rect x="14" y="18" width="3" height="3" />
+              <rect x="18" y="18" width="3" height="3" />
+            </svg>
+          </button>
+          <span>
+            {identity.user_code}
+            {identity.display_name && (
+              <span className="ms-2 text-foreground/60">· {identity.display_name}</span>
+            )}
+          </span>
         </div>
       </header>
 
@@ -112,10 +133,28 @@ export function NedaApp() {
 
       {/* Body */}
       <main className="flex-1 flex flex-col min-h-0">
-        {tab === "messages" && <MessagesTab />}
+        {tab === "messages" && (
+          <MessagesTab
+            initialPeer={pendingPeer}
+            onPeerConsumed={() => setPendingPeer(null)}
+          />
+        )}
         {tab === "groups" && <GroupsTab />}
         {tab === "radar" && <RadarTab />}
       </main>
+
+      {showQR && (
+        <QRVerify
+          myCode={identity.user_code}
+          myId={identity.id}
+          onClose={() => setShowQR(false)}
+          onPeerVerified={(peer) => {
+            setPendingPeer(peer);
+            setTab("messages");
+            setShowQR(false);
+          }}
+        />
+      )}
     </div>
   );
 }

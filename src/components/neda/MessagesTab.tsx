@@ -14,10 +14,23 @@ interface Conversation {
   lastAt: string;
 }
 
-export function MessagesTab() {
+interface MessagesTabProps {
+  initialPeer?: { peerId: string; peerCode: string } | null;
+  onPeerConsumed?: () => void;
+}
+
+export function MessagesTab({ initialPeer, onPeerConsumed }: MessagesTabProps = {}) {
   const { identity } = useIdentity();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [active, setActive] = useState<{ peerId: string; peerCode: string } | null>(null);
+
+  // Open a chat when a peer is pushed in from outside (e.g. QR verify).
+  useEffect(() => {
+    if (initialPeer) {
+      setActive(initialPeer);
+      onPeerConsumed?.();
+    }
+  }, [initialPeer, onPeerConsumed]);
   const [showNew, setShowNew] = useState(false);
   const [newCode, setNewCode] = useState("");
   const [newError, setNewError] = useState<string | null>(null);

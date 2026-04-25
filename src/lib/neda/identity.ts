@@ -11,10 +11,27 @@ export interface NedaIdentity {
   bluetooth_enabled: boolean;
 }
 
+// Short, friendly first-name pool (mix of Persian, Arabic, international).
+export const NAME_POOL: readonly string[] = [
+  "sam", "nima", "dara", "kian", "sara", "mina", "zara", "reza", "amir", "tara",
+  "lina", "noah", "aria", "yara", "sami", "leya", "rumi", "azad", "noor", "layla",
+  "cyrus", "omid", "navid", "parsa", "rana", "soha", "ziba", "ramin", "shiva", "neda",
+  "luca", "milo", "enzo", "ava", "ela", "ines", "kai", "iva", "anya", "elia",
+  "maya", "ilya", "rami", "sana", "yusra", "hadi", "jana", "leon", "nora", "zaid",
+];
+
+export function pickName(): string {
+  return NAME_POOL[Math.floor(Math.random() * NAME_POOL.length)];
+}
+
+/** Generates a code like "@sam4805". Uniqueness must be enforced by the caller. */
 export function generateUserCode(): string {
   const n = Math.floor(1000 + Math.random() * 9000);
-  return `NEDA-${n}`;
+  return `@${pickName()}${n}`;
 }
+
+/** Regex for the new code format. */
+export const USER_CODE_REGEX = /^@[a-z]{3,5}\d{4}$/;
 
 export function loadIdentity(): NedaIdentity | null {
   if (typeof window === "undefined") return null;

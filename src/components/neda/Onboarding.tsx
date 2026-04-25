@@ -45,26 +45,42 @@ export function Onboarding({ onDone }: Props) {
     setError(null);
     try {
       const name = displayName.trim().slice(0, 20) || null;
-      const { data, error: dbErr } = await supabase
-        .from("users")
-        .insert({
-          user_code: userCode,
-          display_name: name,
-          country: country.name,
-          language: country.language,
-          bluetooth_enabled: bluetooth,
-        })
-        .select("id, user_code, display_name, country, language, bluetooth_enabled")
-        .single();
-      if (dbErr || !data) throw new Error(dbErr?.message ?? "insert failed");
+
+      // Try a few times in case of collision (very unlikely with ~50 names × 9000 numbers).
+      let attempt = 0;
+      let inserted: { id: string; user_code: string; display_name: string | null; country: string; language: string; bluetooth_enabled: boolean } | null = null;
+      let lastErr: string | null = null;
+      while (attempt < 5 && !inserted) {
+        const code = attempt === 0 ? userCode : generateUserCode();
+        const { data, error: dbErr } = await supabase
+          .from("users")
+          .insert({
+            user_code: code,
+            display_name: name,
+            country: country.name,
+            language: country.language,
+            bluetooth_enabled: bluetooth,
+          })
+          .select("id, user_code, display_name, country, language, bluetooth_enabled")
+          .single();
+        if (data) {
+          inserted = data;
+          break;
+        }
+        lastErr = dbErr?.message ?? "insert failed";
+        // 23505 = unique_violation -> retry with new random code.
+        if (!dbErr || (dbErr as { code?: string }).code !== "23505") break;
+        attempt++;
+      }
+      if (!inserted) throw new Error(lastErr ?? "insert failed");
 
       const ident: NedaIdentity = {
-        id: data.id,
-        user_code: data.user_code,
-        display_name: data.display_name,
-        country: data.country,
-        language: data.language as LangCode,
-        bluetooth_enabled: data.bluetooth_enabled,
+        id: inserted.id,
+        user_code: inserted.user_code,
+        display_name: inserted.display_name,
+        country: inserted.country,
+        language: inserted.language as LangCode,
+        bluetooth_enabled: inserted.bluetooth_enabled,
       };
       setIdentity(ident);
       onDone();

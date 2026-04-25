@@ -34,6 +34,12 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#0a1628" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { property: "og:title", content: "NEDA" },
+      { name: "twitter:title", content: "NEDA" },
+      { property: "og:description", content: "NEDA — peer-to-peer emergency messaging." },
+      { name: "twitter:description", content: "NEDA — peer-to-peer emergency messaging." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ba28ed1f-503e-4c9f-9170-302c673a0bab/id-preview-2924ac83--a9ee2ee8-55cd-4f86-9597-c5e333362537.lovable.app-1777126265181.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ba28ed1f-503e-4c9f-9170-302c673a0bab/id-preview-2924ac83--a9ee2ee8-55cd-4f86-9597-c5e333362537.lovable.app-1777126265181.png" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },

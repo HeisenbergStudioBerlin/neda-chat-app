@@ -228,6 +228,12 @@ export function ChatView({ peerId, peerCode, groupId, groupName, onBack }: Props
             m.translated_content?.[lang] ?? m.translated_content?.[m.original_language] ?? m.content;
           const showOriginal = !mine && m.original_language !== lang;
           const pulsing = pulseIds.has(m.id);
+          const hops = simulatedHopCount(m.id);
+          const senderLabel = mine
+            ? "YOU"
+            : groupId
+              ? (senderCodes[m.sender_id] ?? "PEER")
+              : (peerCode ?? "PEER");
           return (
             <div
               key={m.id}
@@ -239,14 +245,19 @@ export function ChatView({ peerId, peerCode, groupId, groupName, onBack }: Props
                 {!mine && pulsing && (
                   <span className="inline-block w-2 h-2 bg-signal neda-blink" />
                 )}
-                <span className="text-[10px] uppercase text-muted-foreground">
-                  {mine ? "YOU" : "PEER"} · {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                <span className="text-[10px] uppercase text-muted-foreground tracking-wider">
+                  {senderLabel} · {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
               <div className="whitespace-pre-wrap break-words">{txt}</div>
               {showOriginal && (
                 <div className="text-[10px] text-muted-foreground mt-1 opacity-70">
                   [{m.original_language}] {m.content}
+                </div>
+              )}
+              {!mine && (
+                <div className="text-[10px] text-signal/80 mt-1 font-mono">
+                  {senderLabel} ⟶ {hops} {hops === 1 ? "peer" : "peers"} ⟶ you
                 </div>
               )}
             </div>

@@ -4,6 +4,7 @@ import { useIdentity } from "@/hooks/use-identity";
 import { ChatView } from "./ChatView";
 import { t } from "@/lib/neda/i18n";
 import type { LangCode } from "@/lib/neda/countries";
+import { USER_CODE_REGEX } from "@/lib/neda/identity";
 
 interface Conversation {
   peerId: string;
@@ -75,11 +76,58 @@ export function MessagesTab() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
-        (payload) => {
-          const m = payload.new as { sender_id: string; recipient_id: string | null; group_id: string | null };
+        async (payload) => {
+          const m = payload.new as {
+            sender_id: string;
+            recipient_id: string | null;
+            group_id: string | null;
+            content: string;
+            created_at: string;
+          };
           if (m.group_id) return;
-          if (m.sender_id === identity.id || m.recipient_id === identity.id) {
-            load();
+          if (m.sender_id !== identity.id && m.recipient_id !== identity.id) return;
+          const peerId = m.sender_id === identity.id ? m.recipient_id : m.sender_id;
+          if (!peerId) return;
+
+          // Update existing conversation OR add a new one — never wipe the list.
+          setConversations((prev) => {
+            const existingIdx = prev.findIndex((c) => c.peerId === peerId);
+            if (existingIdx >= 0) {
+              const next = [...prev];
+              next[existingIdx] = {
+                ...next[existingIdx],
+                lastContent: m.content,
+                lastAt: m.created_at,
+              };
+              // Move to top.
+              const [moved] = next.splice(existingIdx, 1);
+              return [moved, ...next];
+            }
+            // New peer — add placeholder, fetch peer info async.
+            const placeholder: Conversation = {
+              peerId,
+              peerCode: "…",
+              peerName: null,
+              lastContent: m.content,
+              lastAt: m.created_at,
+            };
+            return [placeholder, ...prev];
+          });
+
+          // Fetch peer info if we don't know it yet.
+          const { data: peer } = await supabase
+            .from("users")
+            .select("id, user_code, display_name")
+            .eq("id", peerId)
+            .maybeSingle();
+          if (peer) {
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.peerId === peer.id
+                  ? { ...c, peerCode: peer.user_code, peerName: peer.display_name }
+                  : c,
+              ),
+            );
           }
         },
       )
@@ -92,13 +140,13 @@ export function MessagesTab() {
 
   async function startNew() {
     if (!identity) return;
-    const code = newCode.trim().toUpperCase();
-    if (!/^NEDA-\d{4}$/.test(code)) {
-      setNewError("Format: NEDA-1234");
+    const code = newCode.trim().toLowerCase();
+    if (!USER_CODE_REGEX.test(code)) {
+      setNewError(t(lang, "invalid_user_id"));
       return;
     }
     if (code === identity.user_code) {
-      setNewError("That's you.");
+      setNewError(t(lang, "same_user_id"));
       return;
     }
     setCreating(true);

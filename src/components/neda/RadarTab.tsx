@@ -110,6 +110,11 @@ export function RadarTab() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const reportsRef = useRef<ReportWithDistance[]>([]);
+  const simContactsRef = useRef<SimContact[]>([]);
+  const [simStats, setSimStats] = useState<{ threats: number; peers: number }>({
+    threats: 0,
+    peers: 0,
+  });
   const rafRef = useRef<number | null>(null);
 
   // Compass heading: target = latest device alpha, smoothed = lerped value drawn to canvas.

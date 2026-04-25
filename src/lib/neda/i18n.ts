@@ -110,6 +110,7 @@ const de: Dict = {
   radar_distance: "km",
   radar_loading: "POSITION WIRD ERMITTELT...",
   radar_no_gps: "STANDORT VERWEIGERT",
+  radar_simulated: "SIMULIERTER STANDORT",
 };
 
 const fr: Dict = {

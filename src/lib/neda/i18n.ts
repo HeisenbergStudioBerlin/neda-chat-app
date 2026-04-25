@@ -3,7 +3,7 @@ import type { LangCode } from "./countries";
 type Dict = Record<string, string>;
 
 const en: Dict = {
-  app_tagline: "For there is always light, if only we're brave enough to see it.",
+  app_tagline: "For there is always light, if only we're brave enough to see it. If only we're brave enough to be it.",
   app_tagline_attr: "— Amanda Gorman",
   step1_title: "Select your country",
   step1_hint: "Type to search. Language switches automatically.",

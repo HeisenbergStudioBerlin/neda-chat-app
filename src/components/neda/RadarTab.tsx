@@ -364,7 +364,7 @@ export function RadarTab() {
     const GREEN_DIM = "rgba(0, 212, 255, 0.25)";
     const GREEN_FAINT = "rgba(0, 212, 255, 0.12)";
     const GREEN_LABEL = "rgba(0, 212, 255, 0.55)";
-    const BG = "#000a12";
+    const BG_WASH = "rgba(0, 10, 18, 0.46)";
     const RED = "#ff2b2b";
 
     const start = performance.now();
@@ -376,8 +376,10 @@ export function RadarTab() {
       const dt = Math.min(0.1, (t - lastT) / 1000);
       lastT = t;
 
-      // Background — dark green/black.
-      ctx.fillStyle = BG;
+      // Background wash — keep alpha so the street map layer directly behind the
+      // radar remains visible while points/sweep stay on the top canvas.
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = BG_WASH;
       ctx.fillRect(0, 0, width, height);
 
       const cx = width / 2;
@@ -402,7 +404,7 @@ export function RadarTab() {
       // Outer disc fill (slightly lighter than bg).
       ctx.beginPath();
       ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(0, 20, 40, 0.55)";
+      ctx.fillStyle = "rgba(0, 20, 40, 0.26)";
       ctx.fill();
 
       // Concentric rings: 1km, 2km, 5km (relative to RADIUS_KM scope).

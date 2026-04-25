@@ -5,6 +5,7 @@ import { translateMessage } from "@/lib/neda/translate.functions";
 import { notifyIncoming } from "@/lib/neda/notify";
 import { isRTL, type LangCode } from "@/lib/neda/countries";
 import { t } from "@/lib/neda/i18n";
+import { simulatedHopCount } from "@/lib/mesh/protocol";
 
 export interface ChatMessage {
   id: string;
@@ -35,6 +36,7 @@ export function ChatView({ peerId, peerCode, groupId, groupName, onBack }: Props
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [pulseIds, setPulseIds] = useState<Set<string>>(new Set());
+  const [senderCodes, setSenderCodes] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const lang: LangCode = (identity?.language ?? "en") as LangCode;
@@ -135,6 +137,31 @@ export function ChatView({ peerId, peerCode, groupId, groupName, onBack }: Props
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
+  // Resolve sender user_codes for group messages we don't already know.
+  useEffect(() => {
+    if (!groupId) return;
+    const missing = Array.from(
+      new Set(messages.map((m) => m.sender_id).filter((id) => !senderCodes[id])),
+    );
+    if (missing.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("users")
+        .select("id, user_code")
+        .in("id", missing);
+      if (!data || cancelled) return;
+      setSenderCodes((prev) => {
+        const next = { ...prev };
+        for (const u of data) next[u.id] = u.user_code;
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [messages, groupId, senderCodes]);
+
   async function send() {
     if (!identity || !draft.trim() || sending) return;
     const content = draft.trim().slice(0, MAX_LEN);
@@ -201,6 +228,12 @@ export function ChatView({ peerId, peerCode, groupId, groupName, onBack }: Props
             m.translated_content?.[lang] ?? m.translated_content?.[m.original_language] ?? m.content;
           const showOriginal = !mine && m.original_language !== lang;
           const pulsing = pulseIds.has(m.id);
+          const hops = simulatedHopCount(m.id);
+          const senderLabel = mine
+            ? "YOU"
+            : groupId
+              ? (senderCodes[m.sender_id] ?? "PEER")
+              : (peerCode ?? "PEER");
           return (
             <div
               key={m.id}
@@ -212,14 +245,19 @@ export function ChatView({ peerId, peerCode, groupId, groupName, onBack }: Props
                 {!mine && pulsing && (
                   <span className="inline-block w-2 h-2 bg-signal neda-blink" />
                 )}
-                <span className="text-[10px] uppercase text-muted-foreground">
-                  {mine ? "YOU" : "PEER"} · {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                <span className="text-[10px] uppercase text-muted-foreground tracking-wider">
+                  {senderLabel} · {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
               <div className="whitespace-pre-wrap break-words">{txt}</div>
               {showOriginal && (
                 <div className="text-[10px] text-muted-foreground mt-1 opacity-70">
                   [{m.original_language}] {m.content}
+                </div>
+              )}
+              {!mine && (
+                <div className="text-[10px] text-signal/80 mt-1 font-mono">
+                  {senderLabel} ⟶ {hops} {hops === 1 ? "peer" : "peers"} ⟶ you
                 </div>
               )}
             </div>

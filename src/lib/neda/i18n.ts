@@ -44,6 +44,18 @@ const en: Dict = {
   leave: "LEAVE",
   joined: "JOINED",
   user_not_found: "USER NOT FOUND",
+  empty_groups: "NO GROUPS YET",
+  my_groups: "MY GROUPS",
+  open_groups: "OPEN CHANNELS",
+  members: "members",
+  create: "CREATE",
+  radar_title: "DANGER RADAR",
+  radar_hint: "Active reports within 50km, last 2h.",
+  radar_empty: "AREA CLEAR",
+  radar_ago: "ago",
+  radar_distance: "km",
+  radar_loading: "ACQUIRING POSITION...",
+  radar_no_gps: "LOCATION DENIED",
 };
 
 const de: Dict = {
@@ -85,6 +97,18 @@ const de: Dict = {
   leave: "VERLASSEN",
   joined: "BEIGETRETEN",
   user_not_found: "USER NICHT GEFUNDEN",
+  empty_groups: "NOCH KEINE GRUPPEN",
+  my_groups: "MEINE GRUPPEN",
+  open_groups: "OFFENE KANÄLE",
+  members: "Mitglieder",
+  create: "ERSTELLEN",
+  radar_title: "GEFAHREN-RADAR",
+  radar_hint: "Aktive Meldungen im Umkreis von 50 km, letzte 2 h.",
+  radar_empty: "BEREICH FREI",
+  radar_ago: "her",
+  radar_distance: "km",
+  radar_loading: "POSITION WIRD ERMITTELT...",
+  radar_no_gps: "STANDORT VERWEIGERT",
 };
 
 const fr: Dict = {

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useIdentity } from "@/hooks/use-identity";
 import { Onboarding } from "./Onboarding";
 import { MessagesTab } from "./MessagesTab";
-import { PlaceholderTab } from "./PlaceholderTab";
+import { GroupsTab } from "./GroupsTab";
+import { RadarTab } from "./RadarTab";
 import { supabase } from "@/integrations/supabase/client";
 import { t } from "@/lib/neda/i18n";
 import type { LangCode } from "@/lib/neda/countries";
@@ -112,8 +113,8 @@ export function NedaApp() {
       {/* Body */}
       <main className="flex-1 flex flex-col min-h-0">
         {tab === "messages" && <MessagesTab />}
-        {tab === "groups" && <PlaceholderTab lang={lang} label="GROUPS" />}
-        {tab === "radar" && <PlaceholderTab lang={lang} label="DANGER RADAR" />}
+        {tab === "groups" && <GroupsTab />}
+        {tab === "radar" && <RadarTab />}
       </main>
     </div>
   );

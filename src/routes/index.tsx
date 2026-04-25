@@ -14,7 +14,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "For there is always light, if only we're brave enough to see it. — Amanda Gorman",
+          "For there is always light, if only we're brave enough to see it. If only we're brave enough to be it. — Amanda Gorman",
       },
     ],
   }),

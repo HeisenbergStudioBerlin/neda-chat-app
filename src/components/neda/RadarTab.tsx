@@ -81,6 +81,12 @@ export function RadarTab() {
   const reportsRef = useRef<ReportWithDistance[]>([]);
   const rafRef = useRef<number | null>(null);
 
+  // Compass heading: target = latest device alpha, smoothed = lerped value drawn to canvas.
+  const headingTargetRef = useRef<number | null>(null);
+  const headingSmoothedRef = useRef<number>(0);
+  const [hasCompass, setHasCompass] = useState(false);
+  const [headingDisplay, setHeadingDisplay] = useState<number | null>(null);
+
   const lang: LangCode = (identity?.language ?? "en") as LangCode;
 
   // Keep latest reports accessible to the animation loop without restart.

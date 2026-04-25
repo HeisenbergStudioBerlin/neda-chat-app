@@ -130,6 +130,61 @@ export function RadarTab() {
     reportsRef.current = reports;
   }, [reports]);
 
+  // ---- Simulated contacts spawner (demo / hackathon) ----
+  useEffect(() => {
+    const start = performance.now();
+    const MAX_THREATS = 6;
+
+    const spawnThreat = () => {
+      const list = simContactsRef.current;
+      const threats = list.filter((s) => s.kind === "threat").length;
+      if (threats >= MAX_THREATS) return;
+      const { dx, dy } = randomInRadius(RADIUS_KM);
+      const t = (performance.now() - start) / 1000;
+      list.push({
+        id: `t_${t.toFixed(3)}_${Math.random().toString(36).slice(2, 7)}`,
+        kind: "threat",
+        dx,
+        dy,
+        bornAt: t,
+        life: 20 + Math.random() * 10,
+      });
+    };
+
+    const spawnPeer = () => {
+      const list = simContactsRef.current;
+      const { dx, dy } = randomInRadius(RADIUS_KM);
+      const t = (performance.now() - start) / 1000;
+      list.push({
+        id: `p_${t.toFixed(3)}_${Math.random().toString(36).slice(2, 7)}`,
+        kind: "peer",
+        dx,
+        dy,
+        bornAt: t,
+        life: 18 + Math.random() * 14,
+      });
+    };
+
+    // Initial population so the radar isn't empty on first paint.
+    for (let i = 0; i < 3; i++) spawnThreat();
+    for (let i = 0; i < 9; i++) spawnPeer();
+
+    const tick = window.setInterval(() => {
+      const t = (performance.now() - start) / 1000;
+      simContactsRef.current = simContactsRef.current.filter(
+        (s) => t - s.bornAt < s.life,
+      );
+      if (Math.random() < 0.35) spawnThreat();
+      const threats = simContactsRef.current.filter((s) => s.kind === "threat").length;
+      const peers = simContactsRef.current.filter((s) => s.kind === "peer").length;
+      const targetPeers = Math.max(threats * 3, 6);
+      if (peers < targetPeers) spawnPeer();
+      setSimStats({ threats, peers });
+    }, 2500);
+
+    return () => window.clearInterval(tick);
+  }, []);
+
   // Get geolocation (with fallback to Tehran for demo).
   useEffect(() => {
     let resolved = false;

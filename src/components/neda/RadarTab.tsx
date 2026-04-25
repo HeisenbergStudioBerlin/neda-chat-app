@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useIdentity } from "@/hooks/use-identity";
 import { t } from "@/lib/neda/i18n";
 import type { LangCode } from "@/lib/neda/countries";
-import radarMapBg from "@/assets/radar-map.png";
 
 interface DangerReport {
   id: string;
@@ -22,7 +21,8 @@ interface ReportWithDistance extends DangerReport {
 
 const RADIUS_KM = 5; // visible scope of the radar disc.
 const MAX_REPORT_KM = 50; // we still pull within 50km, but plot at edge if outside disc.
-const TILE_ZOOM = 13; // OSM zoom level — ~5km radius fits well at z13.
+const TILE_ZOOM = 14; // Carto Dark tile zoom for the in-canvas radar map.
+const TILE_SIZE = 256;
 
 // Tehran fallback for demo when GPS is unavailable (e.g. Lovable preview iframe).
 const FALLBACK_POS = { lat: 35.6892, lon: 51.389 };
@@ -46,16 +46,43 @@ function randomInRadius(maxKm: number): { dx: number; dy: number } {
   return { dx: Math.cos(a) * r, dy: Math.sin(a) * r };
 }
 
-/** Convert a lat/lon to an OSM tile (x,y,z) at integer zoom. */
-function lonLatToTile(lat: number, lon: number, z: number) {
-  const n = 2 ** z;
-  const xt = ((lon + 180) / 360) * n;
-  const latRad = (lat * Math.PI) / 180;
-  const yt =
-    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
-  return { x: xt, y: yt, z };
+function lon2tile(lon: number, zoom: number): number {
+  return Math.floor(((lon + 180) / 360) * Math.pow(2, zoom));
 }
 
+function lat2tile(lat: number, zoom: number): number {
+  return Math.floor(
+    ((1 -
+      Math.log(
+        Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180),
+      ) /
+        Math.PI) /
+      2) *
+      Math.pow(2, zoom),
+  );
+}
+
+function lonLatToTilePoint(lat: number, lon: number, zoom: number): { x: number; y: number } {
+  const n = Math.pow(2, zoom);
+  const latRad = (lat * Math.PI) / 180;
+  return {
+    x: ((lon + 180) / 360) * n,
+    y: ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n,
+  };
+}
+
+interface RadarMapTile {
+  image: HTMLImageElement;
+  dx: number;
+  dy: number;
+  loaded: boolean;
+}
+
+interface RadarMapGrid {
+  tiles: RadarMapTile[];
+  offsetX: number;
+  offsetY: number;
+}
 
 function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const R = 6371;
@@ -112,6 +139,8 @@ export function RadarTab() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const reportsRef = useRef<ReportWithDistance[]>([]);
   const simContactsRef = useRef<SimContact[]>([]);
+  const mapTilesRef = useRef<RadarMapGrid | null>(null);
+  const tilesLoadedRef = useRef(false);
   const [simStats, setSimStats] = useState<{ threats: number; peers: number }>({
     threats: 0,
     peers: 0,
@@ -221,6 +250,50 @@ export function RadarTab() {
 
     return () => window.clearTimeout(timeoutId);
   }, []);
+
+  // Load the 3×3 Carto Dark tile grid around the user's position for in-canvas drawing.
+  useEffect(() => {
+    if (!pos) return;
+
+    let cancelled = false;
+    tilesLoadedRef.current = false;
+
+    const centerX = lon2tile(pos.lon, TILE_ZOOM);
+    const centerY = lat2tile(pos.lat, TILE_ZOOM);
+    const exact = lonLatToTilePoint(pos.lat, pos.lon, TILE_ZOOM);
+    const offsetX = exact.x - centerX;
+    const offsetY = exact.y - centerY;
+    const tiles: RadarMapTile[] = [];
+    let completed = 0;
+    let loaded = 0;
+
+    const finishTile = (tile: RadarMapTile, ok: boolean) => {
+      tile.loaded = ok;
+      completed += 1;
+      if (ok) loaded += 1;
+      if (!cancelled && completed === 9) {
+        tilesLoadedRef.current = loaded === 9;
+      }
+    };
+
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const image = new Image();
+        image.crossOrigin = "anonymous";
+        const tile: RadarMapTile = { image, dx, dy, loaded: false };
+        image.onload = () => finishTile(tile, true);
+        image.onerror = () => finishTile(tile, false);
+        image.src = `https://a.basemaps.cartocdn.com/dark_all/${TILE_ZOOM}/${centerX + dx}/${centerY + dy}@2x.png`;
+        tiles.push(tile);
+      }
+    }
+
+    mapTilesRef.current = { tiles, offsetX, offsetY };
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pos]);
 
   // Device compass — use deviceorientation alpha as heading.
   useEffect(() => {
@@ -364,27 +437,62 @@ export function RadarTab() {
     const GREEN_DIM = "rgba(0, 212, 255, 0.25)";
     const GREEN_FAINT = "rgba(0, 212, 255, 0.12)";
     const GREEN_LABEL = "rgba(0, 212, 255, 0.55)";
-    const BG_WASH = "rgba(0, 10, 18, 0.18)";
     const RED = "#ff2b2b";
 
     const start = performance.now();
     let lastT = start;
     let lastHudFrame = -1;
 
+    const drawMapTiles = (centerX: number, centerY: number, radius: number, headingRadians: number) => {
+      const map = mapTilesRef.current;
+      if (!tilesLoadedRef.current || !map) return;
+
+      const drawTileSize = Math.max(TILE_SIZE, (radius * 2.2) / 3);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.globalAlpha = 0.3;
+      ctx.translate(centerX, centerY);
+      ctx.rotate(-headingRadians);
+      ctx.translate(-centerX, -centerY);
+
+      for (const tile of map.tiles) {
+        if (!tile.loaded || !tile.image.complete) continue;
+        const left = centerX + (tile.dx - map.offsetX) * drawTileSize;
+        const top = centerY + (tile.dy - map.offsetY) * drawTileSize;
+        ctx.drawImage(tile.image, left, top, drawTileSize, drawTileSize);
+      }
+
+      ctx.restore();
+    };
+
     const draw = (t: number) => {
       const elapsed = (t - start) / 1000;
       const dt = Math.min(0.1, (t - lastT) / 1000);
       lastT = t;
 
-      // Background wash — keep alpha so the street map layer directly behind the
-      // radar remains visible while points/sweep stay on the top canvas.
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = BG_WASH;
+      ctx.fillStyle = "#000a12";
       ctx.fillRect(0, 0, width, height);
 
       const cx = width / 2;
       const cy = height / 2;
       const maxR = Math.min(width, height) / 2 - 12;
+
+      // ---------- COMPASS HEADING (smoothed lerp) ----------
+      const target = headingTargetRef.current;
+      if (target !== null) {
+        let cur = headingSmoothedRef.current;
+        const diff = ((target - cur + 540) % 360) - 180;
+        cur = (cur + diff * 0.15 + 360) % 360;
+        headingSmoothedRef.current = cur;
+      }
+      const headingRad = (headingSmoothedRef.current * Math.PI) / 180;
+      const ringRotation = -headingRad;
+
+      drawMapTiles(cx, cy, maxR, headingRad);
 
       // Fine grid network across the whole canvas (CRT feel).
       ctx.strokeStyle = "rgba(0, 212, 255, 0.06)";
@@ -401,10 +509,10 @@ export function RadarTab() {
       }
       ctx.stroke();
 
-      // Outer disc fill (slightly lighter than bg).
+      // Outer disc fill (transparent enough for the in-canvas street map to show through).
       ctx.beginPath();
       ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(0, 20, 40, 0.26)";
+      ctx.fillStyle = "rgba(0, 20, 40, 0.1)";
       ctx.fill();
 
       // Concentric rings: 1km, 2km, 5km (relative to RADIUS_KM scope).
@@ -445,20 +553,7 @@ export function RadarTab() {
       ctx.lineTo(cx + diag, cy - diag);
       ctx.stroke();
 
-      // ---------- COMPASS HEADING (smoothed lerp) ----------
-      // Lerp smoothed → target with shortest-path angular interpolation.
-      const target = headingTargetRef.current;
-      if (target !== null) {
-        let cur = headingSmoothedRef.current;
-        let diff = ((target - cur + 540) % 360) - 180; // shortest path in [-180, 180]
-        cur = (cur + diff * 0.15 + 360) % 360;
-        headingSmoothedRef.current = cur;
-      }
-      // Convert heading (0=N, clockwise) to canvas rotation: rotate ring by -heading
-      // so that N marker points to true north regardless of device orientation.
-      const headingRad = (headingSmoothedRef.current * Math.PI) / 180;
-      const ringRotation = -headingRad;
-
+      // ---------- COMPASS RING ----------
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(ringRotation);
@@ -777,94 +872,10 @@ export function RadarTab() {
 
   const reportCount = reports.length;
 
-  // Compute the 3×3 OSM tile grid centered on the user's position.
-  // Renders behind the canvas, dark-inverted via CSS filters.
-  const mapTiles = (() => {
-    if (!pos) return null;
-    const { x: tx, y: ty } = lonLatToTile(pos.lat, pos.lon, TILE_ZOOM);
-    const xi = Math.floor(tx);
-    const yi = Math.floor(ty);
-    // Sub-tile offset (0..1) of the user inside the central tile.
-    const offX = tx - xi;
-    const offY = ty - yi;
-    const TILE = 256;
-    // Translate the 3-tile strip so the user's exact pixel sits at center.
-    // Center = 1.5 tiles in; user is at xi + offX → shift by (offX - 0.5) tiles.
-    const shiftX = -(offX - 0.5) * TILE - TILE * 1.5;
-    const shiftY = -(offY - 0.5) * TILE - TILE * 1.5;
-    const tiles: Array<{ key: string; url: string; left: number; top: number }> = [];
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        // Carto Dark — already dark-blue styled, no CSS filter required, no CORS issues.
-        const url = `https://a.basemaps.cartocdn.com/dark_all/${TILE_ZOOM}/${xi + dx}/${yi + dy}@2x.png`;
-        tiles.push({
-          key: `${xi + dx}_${yi + dy}`,
-          url,
-          left: shiftX + (dx + 1) * TILE,
-          top: shiftY + (dy + 1) * TILE,
-        });
-      }
-    }
-    return tiles;
-  })();
-
   return (
     <div className="flex-1 flex flex-col min-h-0 relative bg-[#000a12]">
       {/* Full-bleed canvas radar */}
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
-        {/* Carto Dark street-map tiles — clipped to a perfect circle behind the radar. */}
-        {mapTiles && (
-          <div
-            className="absolute inset-0 pointer-events-none flex items-center justify-center"
-            aria-hidden="true"
-            style={{ zIndex: 1 }}
-          >
-            <div
-              className="relative aspect-square h-full max-h-full"
-              style={{
-                clipPath: "circle(50% at 50% 50%)",
-                WebkitClipPath: "circle(50% at 50% 50%)",
-              }}
-            >
-              {/* Tile grid, anchored to user position at the center */}
-              <div
-                className="absolute"
-                style={{
-                  left: "50%",
-                  top: "50%",
-                  width: 0,
-                  height: 0,
-                  opacity: 0.85,
-                }}
-              >
-                {mapTiles.map((tile) => (
-                  <img
-                    key={tile.key}
-                    src={tile.url}
-                    alt=""
-                    width={256}
-                    height={256}
-                    loading="lazy"
-                    draggable={false}
-                    style={{
-                      position: "absolute",
-                      left: `${tile.left}px`,
-                      top: `${tile.top}px`,
-                      width: 256,
-                      height: 256,
-                    }}
-                  />
-                ))}
-              </div>
-              {/* Subtle wash so streets read as faint texture, not foreground content. */}
-              <div
-                className="absolute inset-0"
-                style={{ backgroundColor: "rgba(0, 10, 18, 0.4)" }}
-              />
-            </div>
-          </div>
-        )}
-
         <canvas
           ref={canvasRef}
           className="absolute inset-0 block"

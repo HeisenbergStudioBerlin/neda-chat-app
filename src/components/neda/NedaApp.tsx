@@ -5,6 +5,7 @@ import { MessagesTab } from "./MessagesTab";
 import { GroupsTab } from "./GroupsTab";
 import { RadarTab } from "./RadarTab";
 import { QRVerify } from "./QRVerify";
+import { ShareNeda } from "./ShareNeda";
 import { ShutdownBanner } from "./ShutdownBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { t } from "@/lib/neda/i18n";
@@ -18,6 +19,7 @@ export function NedaApp() {
   const [titleTaps, setTitleTaps] = useState(0);
   const [panicMessage, setPanicMessage] = useState<string | null>(null);
   const [showQR, setShowQR] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [pendingPeer, setPendingPeer] = useState<{ peerId: string; peerCode: string } | null>(null);
 
   // Reset taps after a window.
@@ -72,6 +74,18 @@ export function NedaApp() {
           N E D A
         </button>
         <div className="flex items-center gap-3 text-[10px] tracking-wider text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => setShowShare(true)}
+            aria-label="Share NEDA"
+            className="w-7 h-7 flex items-center justify-center border border-signal/40 text-signal hover:bg-signal/10 transition-colors"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" />
+              <polyline points="16 6 12 2 8 6" />
+              <line x1="12" y1="2" x2="12" y2="15" />
+            </svg>
+          </button>
           <button
             type="button"
             onClick={() => setShowQR(true)}
@@ -158,6 +172,8 @@ export function NedaApp() {
           }}
         />
       )}
+
+      {showShare && <ShareNeda onClose={() => setShowShare(false)} />}
     </div>
   );
 }

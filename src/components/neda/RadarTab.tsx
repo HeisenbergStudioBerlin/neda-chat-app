@@ -81,6 +81,12 @@ export function RadarTab() {
   const reportsRef = useRef<ReportWithDistance[]>([]);
   const rafRef = useRef<number | null>(null);
 
+  // Compass heading: target = latest device alpha, smoothed = lerped value drawn to canvas.
+  const headingTargetRef = useRef<number | null>(null);
+  const headingSmoothedRef = useRef<number>(0);
+  const [hasCompass, setHasCompass] = useState(false);
+  const [headingDisplay, setHeadingDisplay] = useState<number | null>(null);
+
   const lang: LangCode = (identity?.language ?? "en") as LangCode;
 
   // Keep latest reports accessible to the animation loop without restart.
@@ -122,6 +128,61 @@ export function RadarTab() {
     );
 
     return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  // Device compass — use deviceorientation alpha as heading.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handle = (e: DeviceOrientationEvent) => {
+      // webkitCompassHeading on iOS Safari is the "true" compass heading (already inverted).
+      const w = e as DeviceOrientationEvent & { webkitCompassHeading?: number };
+      let alpha: number | null = null;
+      if (typeof w.webkitCompassHeading === "number") {
+        alpha = w.webkitCompassHeading;
+      } else if (typeof e.alpha === "number") {
+        alpha = 360 - e.alpha; // alpha is counter-clockwise from N → invert.
+      }
+      if (alpha === null || Number.isNaN(alpha)) return;
+      headingTargetRef.current = ((alpha % 360) + 360) % 360;
+      setHasCompass(true);
+    };
+
+    // iOS 13+ requires explicit permission after a user gesture.
+    type IOSOrientationCtor = typeof DeviceOrientationEvent & {
+      requestPermission?: () => Promise<"granted" | "denied">;
+    };
+    const Ctor = DeviceOrientationEvent as unknown as IOSOrientationCtor;
+    const needsIOSPermission = typeof Ctor.requestPermission === "function";
+
+    let attached = false;
+    const attach = () => {
+      if (attached) return;
+      attached = true;
+      window.addEventListener("deviceorientation", handle, true);
+    };
+
+    if (needsIOSPermission) {
+      // Wait for any user interaction to request permission, then attach.
+      const onGesture = async () => {
+        try {
+          const res = await Ctor.requestPermission!();
+          if (res === "granted") attach();
+        } catch {
+          // ignore — falls back to static labels.
+        }
+        window.removeEventListener("touchend", onGesture);
+        window.removeEventListener("click", onGesture);
+      };
+      window.addEventListener("touchend", onGesture, { once: true });
+      window.addEventListener("click", onGesture, { once: true });
+    } else {
+      attach();
+    }
+
+    return () => {
+      if (attached) window.removeEventListener("deviceorientation", handle, true);
+    };
   }, []);
 
   async function loadReports() {
@@ -216,6 +277,7 @@ export function RadarTab() {
 
     const start = performance.now();
     let lastT = start;
+    let lastHudFrame = -1;
 
     const draw = (t: number) => {
       const elapsed = (t - start) / 1000;
@@ -289,18 +351,61 @@ export function RadarTab() {
       ctx.lineTo(cx + diag, cy - diag);
       ctx.stroke();
 
-      // Tick marks around the perimeter.
+      // ---------- COMPASS HEADING (smoothed lerp) ----------
+      // Lerp smoothed → target with shortest-path angular interpolation.
+      const target = headingTargetRef.current;
+      if (target !== null) {
+        let cur = headingSmoothedRef.current;
+        let diff = ((target - cur + 540) % 360) - 180; // shortest path in [-180, 180]
+        cur = (cur + diff * 0.15 + 360) % 360;
+        headingSmoothedRef.current = cur;
+      }
+      // Convert heading (0=N, clockwise) to canvas rotation: rotate ring by -heading
+      // so that N marker points to true north regardless of device orientation.
+      const headingRad = (headingSmoothedRef.current * Math.PI) / 180;
+      const ringRotation = -headingRad;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(ringRotation);
+
+      // Tick marks around the perimeter (rotated with compass).
       ctx.strokeStyle = GREEN_DIM;
       for (let i = 0; i < 360; i += 10) {
-        const a = (i * Math.PI) / 180;
+        // Canvas 0 = east; subtract π/2 so tick "0" sits at top (north).
+        const a = (i * Math.PI) / 180 - Math.PI / 2;
         const inner = i % 30 === 0 ? maxR - 8 : maxR - 4;
         ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
-        ctx.lineTo(cx + Math.cos(a) * maxR, cy + Math.sin(a) * maxR);
+        ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+        ctx.lineTo(Math.cos(a) * maxR, Math.sin(a) * maxR);
         ctx.stroke();
       }
 
-      // Distance labels.
+      // Cardinal labels (N/E/S/W) — drawn rotated with the ring, but each
+      // glyph itself counter-rotated so it stays upright/readable.
+      ctx.fillStyle = GREEN;
+      ctx.font = "bold 11px 'IBM Plex Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const cardinals: Array<[string, number]> = [
+        ["N", -Math.PI / 2],
+        ["E", 0],
+        ["S", Math.PI / 2],
+        ["W", Math.PI],
+      ];
+      const labelR = maxR + 8;
+      for (const [label, ang] of cardinals) {
+        const lx = Math.cos(ang) * labelR;
+        const ly = Math.sin(ang) * labelR;
+        ctx.save();
+        ctx.translate(lx, ly);
+        ctx.rotate(-ringRotation); // keep glyphs upright
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      }
+      ctx.restore();
+
+      // Distance labels (NOT rotated — relative to user).
       ctx.fillStyle = GREEN_LABEL;
       ctx.font = "10px 'IBM Plex Mono', monospace";
       ctx.textAlign = "left";
@@ -310,15 +415,6 @@ export function RadarTab() {
         ctx.fillText(`${km}km`, cx + r + 4, cy - 6);
       }
 
-      // Cardinal labels (N/E/S/W).
-      ctx.fillStyle = GREEN;
-      ctx.font = "bold 11px 'IBM Plex Mono', monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("N", cx, cy - maxR - 2);
-      ctx.fillText("S", cx, cy + maxR + 2);
-      ctx.fillText("E", cx + maxR + 4, cy);
-      ctx.fillText("W", cx - maxR - 4, cy);
 
       // ---------- SWEEP + PHOSPHOR TRAIL ----------
       // Sweep angle (clockwise, ~4s per rotation), 0 = north (-π/2).
@@ -489,6 +585,12 @@ export function RadarTab() {
       }
       ctx.restore();
 
+      // Throttled HUD heading update (~5 Hz) so React doesn't re-render every frame.
+      if (headingTargetRef.current !== null && Math.floor(elapsed * 5) !== lastHudFrame) {
+        lastHudFrame = Math.floor(elapsed * 5);
+        setHeadingDisplay(Math.round(headingSmoothedRef.current));
+      }
+
       rafRef.current = requestAnimationFrame(draw);
     };
 
@@ -543,6 +645,9 @@ export function RadarTab() {
           <div className="absolute bottom-3 left-3 text-[10px] text-[#00d4ff]/70 tracking-wider pointer-events-none tabular-nums">
             <div>LAT {pos.lat.toFixed(4)}</div>
             <div>LON {pos.lon.toFixed(4)}</div>
+            {hasCompass && headingDisplay !== null && (
+              <div>HDG {String(headingDisplay).padStart(3, "0")}°</div>
+            )}
             {posSource === "simulated" && (
               <div className="mt-1 text-amber-400/90 neda-blink">
                 ⚠ {t(lang, "radar_simulated")}

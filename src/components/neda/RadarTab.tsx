@@ -667,6 +667,66 @@ export function RadarTab() {
         }
       }
 
+      // ---------- SIMULATED CONTACTS (peers + threats) ----------
+      const kmToPx = maxR / RADIUS_KM;
+      const sims = simContactsRef.current;
+      const radPerSecSim = (Math.PI * 2) / 4;
+      for (const s of sims) {
+        const px = cx + s.dx * kmToPx;
+        const py = cy - s.dy * kmToPx;
+        const dist = Math.hypot(px - cx, py - cy);
+        if (dist > maxR - 2) continue;
+
+        const age = elapsed - s.bornAt;
+        const remaining = s.life - age;
+        const lifeAlpha =
+          age < 1 ? Math.max(0, age) : remaining < 1.5 ? Math.max(0, remaining / 1.5) : 1;
+        if (lifeAlpha <= 0) continue;
+
+        const a = Math.atan2(py - cy, px - cx);
+        let angleFromSweep =
+          (((a - sweepAngle) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        if (angleFromSweep > Math.PI) angleFromSweep -= Math.PI * 2;
+        const timeSinceHit = angleFromSweep >= 0 ? angleFromSweep / radPerSecSim : 999;
+        const flash = Math.max(0, Math.exp(-timeSinceHit * 2.4));
+
+        const isPeer = s.kind === "peer";
+        const baseSize = isPeer ? 3 : 4;
+        const color = isPeer ? "#00d4ff" : RED;
+        const colorRgba = isPeer
+          ? (al: number) => `rgba(0, 212, 255, ${al})`
+          : (al: number) => `rgba(255, 43, 43, ${al})`;
+        const localPulse = (Math.sin(elapsed * 4 + s.dx * 3 + s.dy * 5) + 1) / 2;
+        const alpha = (0.5 + flash * 0.45) * lifeAlpha;
+
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10 + flash * 22;
+        ctx.fillStyle = colorRgba(alpha);
+        ctx.beginPath();
+        ctx.arc(px, py, baseSize + flash * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (flash > 0.35) {
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = isPeer
+            ? `rgba(220, 245, 255, ${flash * 0.85 * lifeAlpha})`
+            : `rgba(255, 220, 220, ${flash * 0.9 * lifeAlpha})`;
+          ctx.beginPath();
+          ctx.arc(px, py, baseSize * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.globalAlpha = (0.3 + flash * 0.45) * (1 - localPulse) * lifeAlpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(px, py, baseSize + 3 + localPulse * 7, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // Subtle scanlines for CRT feel.
       ctx.save();
       ctx.globalAlpha = 0.05;

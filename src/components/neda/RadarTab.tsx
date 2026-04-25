@@ -425,39 +425,52 @@ export function RadarTab() {
         const px = cx + Math.cos(a) * r;
         const py = cy + Math.sin(a) * r;
 
-        // Highlight when sweep passes by (within ~20°).
+        // Sweep flash: brightest right as the beam crosses, decays over ~1.2s.
+        // angleFromSweep > 0 means sweep already passed (in trail direction).
         let angleFromSweep = ((a - sweepAngle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-        // Normalize so brightest right after sweep passes (going backwards in trail direction).
         if (angleFromSweep > Math.PI) angleFromSweep -= Math.PI * 2;
-        const sweepProximity = Math.max(
-          0,
-          1 - Math.abs(angleFromSweep) / (Math.PI / 9), // 20° window
-        );
+
+        // Time (s) since the sweep last hit this bearing (sweep does 2π in 4s → π/2 rad/s).
+        // If beam not yet reached, treat as "long ago" (no flash).
+        const radPerSec = (Math.PI * 2) / 4;
+        const timeSinceHit = angleFromSweep >= 0 ? angleFromSweep / radPerSec : 999;
+        // Flash envelope: 1 at hit, exponential decay, gone after ~1.2s.
+        const flash = Math.max(0, Math.exp(-timeSinceHit * 2.2));
 
         const baseSize = edge ? 3 : 4 + Math.min(6, c.count * 1.5);
-        const localPulse = (Math.sin(elapsed * 4 + c.distanceKm) + 1) / 2;
-        const alpha = edge ? 0.45 : 0.7 + sweepProximity * 0.3;
+        const localPulse = (Math.sin(elapsed * 5 + c.distanceKm * 2) + 1) / 2;
+        const alpha = edge ? 0.45 + flash * 0.4 : 0.55 + flash * 0.45;
 
         ctx.save();
         ctx.shadowColor = RED;
-        ctx.shadowBlur = 14 + sweepProximity * 16;
+        ctx.shadowBlur = 12 + flash * 28;
         ctx.fillStyle = `rgba(255, 43, 43, ${alpha})`;
         ctx.beginPath();
-        ctx.arc(px, py, baseSize, 0, Math.PI * 2);
+        ctx.arc(px, py, baseSize + flash * 2, 0, Math.PI * 2);
         ctx.fill();
-        // Outer pulse ring.
-        ctx.globalAlpha = (0.35 + sweepProximity * 0.35) * (1 - localPulse);
+
+        // Bright hot core during flash.
+        if (flash > 0.3) {
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = `rgba(255, 220, 220, ${flash * 0.9})`;
+          ctx.beginPath();
+          ctx.arc(px, py, baseSize * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Continuous pulse ring (always visible, stronger right after flash).
+        ctx.globalAlpha = (0.35 + flash * 0.5) * (1 - localPulse);
         ctx.strokeStyle = RED;
         ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 8;
         ctx.beginPath();
-        ctx.arc(px, py, baseSize + 4 + localPulse * 8, 0, Math.PI * 2);
+        ctx.arc(px, py, baseSize + 4 + localPulse * 10, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
 
         // Cluster count badge.
         if (c.count > 1) {
           ctx.save();
-          ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
           ctx.font = "bold 9px 'IBM Plex Mono', monospace";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";

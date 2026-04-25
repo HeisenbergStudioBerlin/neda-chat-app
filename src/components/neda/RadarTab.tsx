@@ -645,6 +645,9 @@ export function RadarTab() {
           <div className="absolute bottom-3 left-3 text-[10px] text-[#00d4ff]/70 tracking-wider pointer-events-none tabular-nums">
             <div>LAT {pos.lat.toFixed(4)}</div>
             <div>LON {pos.lon.toFixed(4)}</div>
+            {hasCompass && headingDisplay !== null && (
+              <div>HDG {String(headingDisplay).padStart(3, "0")}°</div>
+            )}
             {posSource === "simulated" && (
               <div className="mt-1 text-amber-400/90 neda-blink">
                 ⚠ {t(lang, "radar_simulated")}

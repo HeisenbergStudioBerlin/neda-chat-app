@@ -21,9 +21,40 @@ interface ReportWithDistance extends DangerReport {
 
 const RADIUS_KM = 5; // visible scope of the radar disc.
 const MAX_REPORT_KM = 50; // we still pull within 50km, but plot at edge if outside disc.
+const TILE_ZOOM = 13; // OSM zoom level — ~5km radius fits well at z13.
 
 // Tehran fallback for demo when GPS is unavailable (e.g. Lovable preview iframe).
 const FALLBACK_POS = { lat: 35.6892, lon: 51.389 };
+
+// ---- Simulated contacts (demo / hackathon) ----
+interface SimContact {
+  id: string;
+  kind: "threat" | "peer";
+  /** offset from user in km (north +, east +) */
+  dx: number;
+  dy: number;
+  /** seconds since app start when it appeared */
+  bornAt: number;
+  /** total lifetime in seconds */
+  life: number;
+}
+
+function randomInRadius(maxKm: number): { dx: number; dy: number } {
+  const r = Math.sqrt(Math.random()) * maxKm * 0.95;
+  const a = Math.random() * Math.PI * 2;
+  return { dx: Math.cos(a) * r, dy: Math.sin(a) * r };
+}
+
+/** Convert a lat/lon to an OSM tile (x,y,z) at integer zoom. */
+function lonLatToTile(lat: number, lon: number, z: number) {
+  const n = 2 ** z;
+  const xt = ((lon + 180) / 360) * n;
+  const latRad = (lat * Math.PI) / 180;
+  const yt =
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
+  return { x: xt, y: yt, z };
+}
+
 
 function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const R = 6371;
@@ -79,6 +110,11 @@ export function RadarTab() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const reportsRef = useRef<ReportWithDistance[]>([]);
+  const simContactsRef = useRef<SimContact[]>([]);
+  const [simStats, setSimStats] = useState<{ threats: number; peers: number }>({
+    threats: 0,
+    peers: 0,
+  });
   const rafRef = useRef<number | null>(null);
 
   // Compass heading: target = latest device alpha, smoothed = lerped value drawn to canvas.
@@ -93,6 +129,61 @@ export function RadarTab() {
   useEffect(() => {
     reportsRef.current = reports;
   }, [reports]);
+
+  // ---- Simulated contacts spawner (demo / hackathon) ----
+  useEffect(() => {
+    const start = performance.now();
+    const MAX_THREATS = 6;
+
+    const spawnThreat = () => {
+      const list = simContactsRef.current;
+      const threats = list.filter((s) => s.kind === "threat").length;
+      if (threats >= MAX_THREATS) return;
+      const { dx, dy } = randomInRadius(RADIUS_KM);
+      const t = (performance.now() - start) / 1000;
+      list.push({
+        id: `t_${t.toFixed(3)}_${Math.random().toString(36).slice(2, 7)}`,
+        kind: "threat",
+        dx,
+        dy,
+        bornAt: t,
+        life: 20 + Math.random() * 10,
+      });
+    };
+
+    const spawnPeer = () => {
+      const list = simContactsRef.current;
+      const { dx, dy } = randomInRadius(RADIUS_KM);
+      const t = (performance.now() - start) / 1000;
+      list.push({
+        id: `p_${t.toFixed(3)}_${Math.random().toString(36).slice(2, 7)}`,
+        kind: "peer",
+        dx,
+        dy,
+        bornAt: t,
+        life: 18 + Math.random() * 14,
+      });
+    };
+
+    // Initial population so the radar isn't empty on first paint.
+    for (let i = 0; i < 3; i++) spawnThreat();
+    for (let i = 0; i < 9; i++) spawnPeer();
+
+    const tick = window.setInterval(() => {
+      const t = (performance.now() - start) / 1000;
+      simContactsRef.current = simContactsRef.current.filter(
+        (s) => t - s.bornAt < s.life,
+      );
+      if (Math.random() < 0.35) spawnThreat();
+      const threats = simContactsRef.current.filter((s) => s.kind === "threat").length;
+      const peers = simContactsRef.current.filter((s) => s.kind === "peer").length;
+      const targetPeers = Math.max(threats * 3, 6);
+      if (peers < targetPeers) spawnPeer();
+      setSimStats({ threats, peers });
+    }, 2500);
+
+    return () => window.clearInterval(tick);
+  }, []);
 
   // Get geolocation (with fallback to Tehran for demo).
   useEffect(() => {
@@ -576,6 +667,66 @@ export function RadarTab() {
         }
       }
 
+      // ---------- SIMULATED CONTACTS (peers + threats) ----------
+      const kmToPx = maxR / RADIUS_KM;
+      const sims = simContactsRef.current;
+      const radPerSecSim = (Math.PI * 2) / 4;
+      for (const s of sims) {
+        const px = cx + s.dx * kmToPx;
+        const py = cy - s.dy * kmToPx;
+        const dist = Math.hypot(px - cx, py - cy);
+        if (dist > maxR - 2) continue;
+
+        const age = elapsed - s.bornAt;
+        const remaining = s.life - age;
+        const lifeAlpha =
+          age < 1 ? Math.max(0, age) : remaining < 1.5 ? Math.max(0, remaining / 1.5) : 1;
+        if (lifeAlpha <= 0) continue;
+
+        const a = Math.atan2(py - cy, px - cx);
+        let angleFromSweep =
+          (((a - sweepAngle) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        if (angleFromSweep > Math.PI) angleFromSweep -= Math.PI * 2;
+        const timeSinceHit = angleFromSweep >= 0 ? angleFromSweep / radPerSecSim : 999;
+        const flash = Math.max(0, Math.exp(-timeSinceHit * 2.4));
+
+        const isPeer = s.kind === "peer";
+        const baseSize = isPeer ? 3 : 4;
+        const color = isPeer ? "#00d4ff" : RED;
+        const colorRgba = isPeer
+          ? (al: number) => `rgba(0, 212, 255, ${al})`
+          : (al: number) => `rgba(255, 43, 43, ${al})`;
+        const localPulse = (Math.sin(elapsed * 4 + s.dx * 3 + s.dy * 5) + 1) / 2;
+        const alpha = (0.5 + flash * 0.45) * lifeAlpha;
+
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10 + flash * 22;
+        ctx.fillStyle = colorRgba(alpha);
+        ctx.beginPath();
+        ctx.arc(px, py, baseSize + flash * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (flash > 0.35) {
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = isPeer
+            ? `rgba(220, 245, 255, ${flash * 0.85 * lifeAlpha})`
+            : `rgba(255, 220, 220, ${flash * 0.9 * lifeAlpha})`;
+          ctx.beginPath();
+          ctx.arc(px, py, baseSize * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.globalAlpha = (0.3 + flash * 0.45) * (1 - localPulse) * lifeAlpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(px, py, baseSize + 3 + localPulse * 7, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // Subtle scanlines for CRT feel.
       ctx.save();
       ctx.globalAlpha = 0.05;
@@ -623,10 +774,91 @@ export function RadarTab() {
 
   const reportCount = reports.length;
 
+  // Compute the 3×3 OSM tile grid centered on the user's position.
+  // Renders behind the canvas, dark-inverted via CSS filters.
+  const mapTiles = (() => {
+    if (!pos) return null;
+    const { x: tx, y: ty } = lonLatToTile(pos.lat, pos.lon, TILE_ZOOM);
+    const xi = Math.floor(tx);
+    const yi = Math.floor(ty);
+    // Sub-tile offset (0..1) of the user inside the central tile.
+    const offX = tx - xi;
+    const offY = ty - yi;
+    const TILE = 256;
+    // Translate the 3-tile strip so the user's exact pixel sits at center.
+    // Center = 1.5 tiles in; user is at xi + offX → shift by (offX - 0.5) tiles.
+    const shiftX = -(offX - 0.5) * TILE - TILE * 1.5;
+    const shiftY = -(offY - 0.5) * TILE - TILE * 1.5;
+    const tiles: Array<{ key: string; url: string; left: number; top: number }> = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const url = `https://tile.openstreetmap.org/${TILE_ZOOM}/${xi + dx}/${yi + dy}.png`;
+        tiles.push({
+          key: `${xi + dx}_${yi + dy}`,
+          url,
+          left: shiftX + (dx + 1) * TILE,
+          top: shiftY + (dy + 1) * TILE,
+        });
+      }
+    }
+    return tiles;
+  })();
+
   return (
     <div className="flex-1 flex flex-col min-h-0 relative bg-[#000a12]">
       {/* Full-bleed canvas radar */}
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
+        {/* OSM street map background — dark via CSS filters, masked to a circle. */}
+        {mapTiles && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            aria-hidden="true"
+            style={{
+              maskImage: "radial-gradient(circle at center, #000 60%, transparent 78%)",
+              WebkitMaskImage:
+                "radial-gradient(circle at center, #000 60%, transparent 78%)",
+            }}
+          >
+            <div
+              className="absolute"
+              style={{
+                left: "50%",
+                top: "50%",
+                width: 0,
+                height: 0,
+                filter:
+                  "invert(0.92) hue-rotate(170deg) saturate(0.55) brightness(0.85) contrast(1.1)",
+                opacity: 0.55,
+              }}
+            >
+              {mapTiles.map((tile) => (
+                <img
+                  key={tile.key}
+                  src={tile.url}
+                  alt=""
+                  width={256}
+                  height={256}
+                  loading="lazy"
+                  draggable={false}
+                  style={{
+                    position: "absolute",
+                    left: `${tile.left}px`,
+                    top: `${tile.top}px`,
+                    width: 256,
+                    height: 256,
+                    imageRendering: "pixelated",
+                  }}
+                />
+              ))}
+            </div>
+            {/* Dark wash so the map only faintly shows through, matching radar bg. */}
+            <div
+              className="absolute inset-0"
+              style={{ backgroundColor: "rgba(0, 10, 18, 0.78)" }}
+            />
+          </div>
+        )}
+
         <canvas ref={canvasRef} className="absolute inset-0 block" />
 
         {/* HUD overlay — top */}
@@ -634,9 +866,10 @@ export function RadarTab() {
           <div className="text-[10px] tracking-[0.25em] text-[#00d4ff]/80">
             ◉ {t(lang, "radar_title")}
           </div>
-          <div className="text-[10px] tracking-wider text-[#00d4ff]/70 text-right">
-            <div>RNG {RADIUS_KM}KM</div>
-            <div className="tabular-nums">{reportCount} CONTACTS</div>
+          <div className="text-[10px] tracking-wider text-right tabular-nums leading-tight">
+            <div className="text-[#00d4ff]/70">RNG {RADIUS_KM}KM</div>
+            <div className="text-red-400">⚠ {simStats.threats + reportCount} THREATS</div>
+            <div className="text-[#00d4ff]">◉ {simStats.peers} PEERS</div>
           </div>
         </div>
 
@@ -657,8 +890,8 @@ export function RadarTab() {
         )}
 
         {/* HUD overlay — bottom-right status */}
-        <div className="absolute bottom-3 right-3 text-[10px] text-[#00d4ff]/70 tracking-wider pointer-events-none">
-          {reportCount === 0 ? (
+        <div className="absolute bottom-3 right-3 text-[10px] tracking-wider pointer-events-none">
+          {(simStats.threats + reportCount) === 0 ? (
             <span className="text-[#00d4ff]/80">— {t(lang, "radar_empty")} —</span>
           ) : (
             <span className="text-red-400 neda-blink">⚠ THREATS DETECTED</span>
